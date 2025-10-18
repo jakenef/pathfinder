@@ -61,7 +61,7 @@ function App() {
 
       <ChatInterface messages={session.messages} isProcessing={session.isProcessing} />
 
-      {session.phase === 'major_suggestions' && session.suggestedMajors.length > 0 && !session.isProcessing && (
+      {session.phase === 'major_suggestions' && session.suggestedMajors.length > 0 && (
         <div className="px-6 pb-6">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Your Top Major Matches</h2>

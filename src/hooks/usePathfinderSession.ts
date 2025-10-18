@@ -314,7 +314,7 @@ export function usePathfinderSession() {
         phase: "career_suggestions",
       }));
 
-      const careers = await getCareersForMajor(major.id);
+      const careers = await getCareersForMajor(major.id, major.name, major.description);
       setSession((prev) => ({
         ...prev,
         suggestedCareers: careers,

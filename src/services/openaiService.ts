@@ -74,6 +74,66 @@ export async function sendMessage(
   }
 }
 
+export async function generateCareerSuggestions(
+  majorName: string,
+  majorDescription: string
+): Promise<Array<{name: string, description: string}>> {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === "your_openai_api_key_here") {
+    // Return fallback careers if no API key
+    return [
+      { name: 'Industry Professional', description: `Work in the ${majorName} field applying your expertise to real-world challenges.` },
+      { name: 'Research Specialist', description: `Conduct research and analysis in areas related to ${majorName}.` },
+      { name: 'Consultant', description: `Provide expert guidance and solutions leveraging your ${majorName} knowledge.` },
+    ];
+  }
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a career counselor. Generate 3 specific, realistic career titles and short descriptions for a college major. Return ONLY a JSON array with format: [{\"name\": \"Career Title\", \"description\": \"One sentence description\"}]"
+          },
+          {
+            role: "user",
+            content: `Major: ${majorName}\nDescription: ${majorDescription}\n\nGenerate 3 specific career options.`
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 400,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content || '[]';
+    const careers = JSON.parse(content);
+
+    return careers.length === 3 ? careers : [
+      { name: 'Industry Professional', description: `Work in the ${majorName} field applying your expertise.` },
+      { name: 'Research Specialist', description: `Conduct research in areas related to ${majorName}.` },
+      { name: 'Consultant', description: `Provide expert guidance leveraging your ${majorName} knowledge.` },
+    ];
+  } catch (error) {
+    console.error('Error generating career suggestions:', error);
+    return [
+      { name: 'Industry Professional', description: `Work in the ${majorName} field applying your expertise.` },
+      { name: 'Research Specialist', description: `Conduct research in areas related to ${majorName}.` },
+      { name: 'Consultant', description: `Provide expert guidance leveraging your ${majorName} knowledge.` },
+    ];
+  }
+}
+
 export function buildIntakeContext(
   questionIndex: number,
   totalQuestions: number,

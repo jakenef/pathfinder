@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Major, Career } from '../types';
+import { generateCareerSuggestions } from './openaiService';
 
 export async function getMajors(limit: number = 50): Promise<Major[]> {
   try {
@@ -46,19 +47,32 @@ export async function getMajorById(id: string): Promise<Major | null> {
   }
 }
 
-export async function getCareersForMajor(majorId: string): Promise<Career[]> {
-  try {
-    const { data, error } = await supabase
-      .from('careers')
-      .select('*')
-      .contains('related_major_ids', [majorId]);
+export async function getCareersForMajor(majorId: string, majorName: string, majorDescription?: string): Promise<Career[]> {
+  // Generate AI-based career suggestions using OpenAI
+  const aiCareers = await generateCareerSuggestions(majorName, majorDescription || '');
 
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching careers:', error);
-    return [];
-  }
+  const careers: Career[] = aiCareers.map((aiCareer, index) => ({
+    id: `${majorId}-career-${index + 1}`,
+    name: aiCareer.name,
+    description: aiCareer.description,
+    related_major_ids: [majorId],
+    salary_range: ['$50,000 - $80,000', '$55,000 - $90,000', '$60,000 - $100,000'][index] || '$50,000 - $90,000',
+    job_outlook: ['Growing demand', 'Excellent opportunities', 'Strong growth projected'][index] || 'Positive outlook',
+    required_skills: [
+      ['Problem solving', 'Communication', 'Technical expertise'],
+      ['Analytical thinking', 'Creativity', 'Leadership'],
+      ['Strategic thinking', 'Collaboration', 'Innovation'],
+    ][index] || ['Critical thinking', 'Communication', 'Adaptability'],
+    work_environment: [
+      'Professional setting with collaborative teams',
+      'Dynamic environment with growth potential',
+      'Varied settings with advancement opportunities',
+    ][index] || 'Professional environment',
+    next_steps: 'Gain relevant experience through internships and coursework',
+    created_at: new Date().toISOString(),
+  }));
+
+  return careers;
 }
 
 export async function getAllCareers(limit: number = 20): Promise<Career[]> {

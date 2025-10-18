@@ -204,11 +204,13 @@ export function calculateRIASECScore(userProfile: UserProfile): RIASECScore {
     });
   }
 
-  // Normalize scores to 0-100 scale
+  // Normalize scores to 0-7 scale (to match SOC database)
+  // First, get the max score to normalize
   const maxScore = Math.max(...Object.values(score));
   if (maxScore > 0) {
     for (const key of Object.keys(score) as Array<keyof RIASECScore>) {
-      score[key] = Math.round((score[key] / maxScore) * 100);
+      // Normalize to 0-7 scale
+      score[key] = parseFloat(((score[key] / maxScore) * 7).toFixed(2));
     }
   }
 

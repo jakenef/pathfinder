@@ -79,11 +79,71 @@ export async function findMatchingCareers(
 
     if (basicError) {
       console.error('Error fetching SOC basic data:', basicError);
+      console.error('SOC code searched:', bestMatch.soc_code);
       return [];
     }
 
     if (!bestMatchBasic) {
       console.error('No basic data found for SOC code:', bestMatch.soc_code);
+      console.log('This means the SOC code exists in soc_ri but not in soc_basics table');
+
+      // Skip to the next best match if the top one doesn't have basic data
+      for (let i = 1; i < Math.min(10, scoredCareers.length); i++) {
+        const altMatch = scoredCareers[i];
+        console.log(`Trying alternative match #${i}: ${altMatch.soc_code}`);
+
+        const { data: altBasic, error: altError } = await supabase
+          .from('soc_basics')
+          .select('soc_code, title, description')
+          .eq('soc_code', altMatch.soc_code)
+          .maybeSingle();
+
+        if (!altError && altBasic) {
+          console.log('Found alternative match with basic data:', altBasic.title);
+
+          // Use this alternative match
+          const { data: altRelatedData, error: altRelatedError } = await supabase
+            .from('soc_related')
+            .select('related_soc_code, relatedness_tier')
+            .eq('soc_code', altMatch.soc_code)
+            .order('relatedness_tier', { ascending: true })
+            .limit(3);
+
+          const altRelatedSOCCodes = altRelatedData?.map((r) => r.related_soc_code) || [];
+
+          let altRelatedCareers: SOCCareer[] = [];
+          if (altRelatedSOCCodes.length > 0) {
+            const { data: altRelatedBasics, error: altRelatedBasicsError } = await supabase
+              .from('soc_basics')
+              .select('soc_code, title, description')
+              .in('soc_code', altRelatedSOCCodes);
+
+            if (!altRelatedBasicsError && altRelatedBasics) {
+              altRelatedCareers = altRelatedBasics.map((career) => ({
+                ...career,
+                isRelated: true,
+              }));
+            }
+          }
+
+          const results: SOCCareer[] = [
+            {
+              ...altBasic,
+              matchScore: 100 - Math.round(altMatch.distance),
+              isRelated: false,
+            },
+            ...altRelatedCareers,
+          ];
+
+          console.log('=== CAREER MATCHING RESULTS ===');
+          console.log('Top Match:', results[0].title);
+          console.log('Related Careers:', altRelatedCareers.map((c) => c.title).join(', '));
+
+          return results;
+        }
+      }
+
+      console.error('Could not find any valid SOC match with basic data');
       return [];
     }
 

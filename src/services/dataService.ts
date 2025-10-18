@@ -3,10 +3,23 @@ import type { Major, Career } from '../types';
 
 export async function getMajors(limit: number = 10): Promise<Major[]> {
   try {
-    const { data, error } = await supabase
+    // Try the old majors table first for backward compatibility
+    let { data, error } = await supabase
       .from('majors')
       .select('*')
       .limit(limit);
+
+    // If majors table doesn't exist (PGRST205 or other table-not-found errors), try general_majors
+    if (error && (error.code === 'PGRST205' || error.message?.includes('does not exist'))) {
+      console.log('majors table not found, trying general_majors...');
+      const result = await supabase
+        .from('general_majors')
+        .select('*')
+        .limit(limit);
+
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) throw error;
     return data || [];

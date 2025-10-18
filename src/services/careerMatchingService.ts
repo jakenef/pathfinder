@@ -88,7 +88,8 @@ export async function findMatchingCareers(
       console.log('This means the SOC code exists in soc_ri but not in soc_basics table');
 
       // Skip to the next best match if the top one doesn't have basic data
-      for (let i = 1; i < Math.min(10, scoredCareers.length); i++) {
+      // Try more matches since about half the SOC codes are missing from basics
+      for (let i = 1; i < Math.min(50, scoredCareers.length); i++) {
         const altMatch = scoredCareers[i];
         console.log(`Trying alternative match #${i}: ${altMatch.soc_code}`);
 

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Major, Career } from '../types';
 
-export async function getMajors(limit: number = 10): Promise<Major[]> {
+export async function getMajors(limit: number = 50): Promise<Major[]> {
   try {
     // Try the old majors table first for backward compatibility
     let { data, error } = await supabase
@@ -11,14 +11,27 @@ export async function getMajors(limit: number = 10): Promise<Major[]> {
 
     // If majors table doesn't exist (PGRST205 or other table-not-found errors), try general_majors
     if (error && (error.code === 'PGRST205' || error.message?.includes('does not exist'))) {
-      console.log('majors table not found, trying general_majors...');
+      console.log('majors table not found, using general_majors...');
       const result = await supabase
         .from('general_majors')
         .select('*')
         .limit(limit);
 
-      data = result.data;
-      error = result.error;
+      if (result.error) throw result.error;
+
+      // Map general_majors structure to Major interface
+      const mappedData: Major[] = (result.data || []).map((gm: any) => ({
+        id: gm.cip_code,
+        name: gm.major_title,
+        description: gm.major_summary || '',
+        key_skills: [],
+        personality_traits: [],
+        values_alignment: [],
+        typical_coursework: '',
+        created_at: new Date().toISOString(),
+      }));
+
+      return mappedData;
     }
 
     if (error) throw error;

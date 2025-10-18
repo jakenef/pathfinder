@@ -17,12 +17,19 @@ export function scoreMajors(majors: Major[], userProfile: UserProfile): Major[] 
     let score = 0;
     const matches: string[] = [];
 
+    // Safely handle potentially undefined or null arrays
+    const keySkills = Array.isArray(major.key_skills) ? major.key_skills : [];
+    const personalityTraits = Array.isArray(major.personality_traits) ? major.personality_traits : [];
+    const valuesAlignment = Array.isArray(major.values_alignment) ? major.values_alignment : [];
+    const description = major.description || '';
+    const typicalCoursework = major.typical_coursework || '';
+
     const majorKeywords = [
-      ...major.key_skills,
-      ...major.personality_traits,
-      ...major.values_alignment,
-      ...extractKeywords(major.description),
-      ...extractKeywords(major.typical_coursework)
+      ...keySkills,
+      ...personalityTraits,
+      ...valuesAlignment,
+      ...extractKeywords(description),
+      ...extractKeywords(typicalCoursework)
     ].map(word => word.toLowerCase());
 
     majorKeywords.forEach(majorKw => {
@@ -34,19 +41,19 @@ export function scoreMajors(majors: Major[], userProfile: UserProfile): Major[] 
       });
     });
 
-    const skillMatches = major.key_skills.filter(skill =>
+    const skillMatches = keySkills.filter(skill =>
       Array.from(userKeywords).some(uk =>
         skill.toLowerCase().includes(uk) || uk.includes(skill.toLowerCase())
       )
     );
 
-    const valueMatches = major.values_alignment.filter(value =>
+    const valueMatches = valuesAlignment.filter(value =>
       Array.from(userKeywords).some(uk =>
         value.toLowerCase().includes(uk) || uk.includes(value.toLowerCase())
       )
     );
 
-    const personalityMatches = major.personality_traits.filter(trait =>
+    const personalityMatches = personalityTraits.filter(trait =>
       Array.from(userKeywords).some(uk =>
         trait.toLowerCase().includes(uk) || uk.includes(trait.toLowerCase())
       )

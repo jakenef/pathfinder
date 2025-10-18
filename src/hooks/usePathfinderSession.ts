@@ -18,6 +18,7 @@ import {
   getTopRIASECCodes,
   getRIASECDescription,
 } from "../services/riasecService";
+import { findMatchingCareers } from "../services/careerMatchingService";
 
 const initialSessionState: SessionState = {
   phase: "welcome",
@@ -33,6 +34,7 @@ const initialSessionState: SessionState = {
   suggestedMajors: [],
   selectedMajor: null,
   suggestedCareers: [],
+  matchedSOCCareers: [],
   conversationHistory: [],
   isAISpeaking: false,
   isProcessing: false,
@@ -221,10 +223,14 @@ export function usePathfinderSession() {
             riasecScore,
           };
 
+          // Find matching careers based on RIASEC score
+          const matchedCareers = await findMatchingCareers(riasecScore);
+
           setSession((prev) => ({
             ...prev,
             phase: "major_suggestions",
             userProfile: profileWithRIASEC,
+            matchedSOCCareers: matchedCareers,
           }));
 
           const allMajors = await getMajors();

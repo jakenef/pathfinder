@@ -82,19 +82,59 @@ function App() {
       {session.phase === "major_suggestions" &&
         session.suggestedMajors.length > 0 && (
           <div className="px-6 pb-6">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Your Top Major Matches
-              </h2>
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {session.suggestedMajors.map((major) => (
-                  <MajorCard
-                    key={major.id}
-                    major={major}
-                    onSelect={selectMajor}
-                    isSelected={session.selectedMajor?.id === major.id}
-                  />
-                ))}
+            <div className="max-w-4xl mx-auto space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  Your Top Career Matches
+                </h2>
+                {session.matchedSOCCareers.length > 0 && (
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
+                    {session.matchedSOCCareers.slice(0, 4).map((career) => (
+                      <div
+                        key={career.soc_code}
+                        className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 p-6 border border-gray-100"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                            {career.title}
+                          </h3>
+                          {career.matchScore && !career.isRelated && (
+                            <span className="ml-2 px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex-shrink-0">
+                              Top Match
+                            </span>
+                          )}
+                          {career.isRelated && (
+                            <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full flex-shrink-0">
+                              Related
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                          {career.description}
+                        </p>
+                        <div className="mt-3 text-xs text-gray-500">
+                          SOC Code: {career.soc_code}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  Your Top Major Matches
+                </h2>
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
+                  {session.suggestedMajors.map((major) => (
+                    <MajorCard
+                      key={major.id}
+                      major={major}
+                      onSelect={selectMajor}
+                      isSelected={session.selectedMajor?.id === major.id}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

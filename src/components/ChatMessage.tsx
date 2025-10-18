@@ -1,16 +1,12 @@
 import type { Message } from "../types";
-import { User, Sparkles, SkipForward } from "lucide-react";
+import { User, Sparkles } from "lucide-react";
 
 interface ChatMessageProps {
   message: Message;
-  isAudioPlaying?: boolean;
-  onSkipAudio?: () => void;
 }
 
 export function ChatMessage({
   message,
-  isAudioPlaying,
-  onSkipAudio,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
 

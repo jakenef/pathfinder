@@ -12,7 +12,6 @@ interface ChatInterfaceProps {
 export function ChatInterface({
   messages,
   isProcessing,
-  currentSpeakingMessageId,
 }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,8 +34,6 @@ export function ChatInterface({
           <ChatMessage
             key={message.id}
             message={message}
-            isAudioPlaying={currentSpeakingMessageId === message.id}
-            // Skip button removed
           />
         ))}
 

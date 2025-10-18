@@ -248,8 +248,13 @@ function scoreSOCMatch(soc: { title: string; description: string }, searchTerm: 
       matchType = `all ${searchWords.length} keywords in title`;
     }
     else if (titleWordMatches.length > 0) {
-      score = 500 + (titleWordMatches.length * 50);
-      matchType = `${titleWordMatches.length}/${searchWords.length} keywords in title`;
+      if (searchWords.length >= 2 && titleWordMatches.length === 1) {
+        score = 300 + (titleWordMatches.length * 30);
+        matchType = `${titleWordMatches.length}/${searchWords.length} keywords in title (low confidence)`;
+      } else {
+        score = 500 + (titleWordMatches.length * 50);
+        matchType = `${titleWordMatches.length}/${searchWords.length} keywords in title`;
+      }
     }
     else if (lowerDescription.includes(lowerSearch)) {
       score = 300;
@@ -315,7 +320,7 @@ async function findSOCCodeForCareer(careerTitle: string): Promise<SOCCareer | nu
 
     const bestMatch = scoredMatches[0].soc;
 
-    if (scoredMatches[0].score < 200) {
+    if (scoredMatches[0].score < 500) {
       console.log(`   ⚠️ Low confidence match (score: ${scoredMatches[0].score}), using AI fallback...`);
     } else {
       return bestMatch;

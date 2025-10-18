@@ -395,7 +395,7 @@ export function usePathfinderSession() {
   const skipToDemo = useCallback(async () => {
     try {
       console.log("=== SKIP TO DEMO STARTED ===");
-      
+
       // Show loading state
       setSession((prev) => ({ ...prev, isProcessing: true }));
 
@@ -429,18 +429,28 @@ export function usePathfinderSession() {
 
       // TEST: Check if database has data
       const { data: testMajors, error: testMajorsError } = await supabase
-        .from('general_majors')
-        .select('cip_code')
+        .from("general_majors")
+        .select("cip_code")
         .limit(1);
-      
+
       const { data: testCareers, error: testCareersError } = await supabase
-        .from('soc_basics')
-        .select('soc_code')
+        .from("soc_basics")
+        .select("soc_code")
         .limit(1);
 
       console.log("=== DATABASE TEST ===");
-      console.log("general_majors test:", testMajorsError ? `ERROR: ${testMajorsError.message}` : `OK (${testMajors?.length || 0} records)`);
-      console.log("soc_basics test:", testCareersError ? `ERROR: ${testCareersError.message}` : `OK (${testCareers?.length || 0} records)`);
+      console.log(
+        "general_majors test:",
+        testMajorsError
+          ? `ERROR: ${testMajorsError.message}`
+          : `OK (${testMajors?.length || 0} records)`
+      );
+      console.log(
+        "soc_basics test:",
+        testCareersError
+          ? `ERROR: ${testCareersError.message}`
+          : `OK (${testCareers?.length || 0} records)`
+      );
       console.log("====================");
 
       // Fetch matching careers and majors in parallel
@@ -495,7 +505,8 @@ export function usePathfinderSession() {
       setSession((prev) => ({ ...prev, isProcessing: false }));
       setTimeout(() => setError(null), 3000);
     }
-  }, []);  const setSelectedVoice = useCallback((voiceId: string) => {
+  }, []);
+  const setSelectedVoice = useCallback((voiceId: string) => {
     setSession((prev) => ({ ...prev, selectedVoiceId: voiceId }));
   }, []);
 

@@ -14,12 +14,14 @@ function App() {
     audioState,
     interimTranscript,
     error,
+    currentSpeakingMessageId,
     startSession,
     handleUserMessage,
     selectMajor,
     goToSummary,
     restartSession,
-    toggleRecording
+    toggleRecording,
+    skipAudio
   } = usePathfinderSession();
 
   if (session.phase === 'welcome') {
@@ -59,7 +61,12 @@ function App() {
         </div>
       )}
 
-      <ChatInterface messages={session.messages} isProcessing={session.isProcessing} />
+      <ChatInterface
+        messages={session.messages}
+        isProcessing={session.isProcessing}
+        currentSpeakingMessageId={currentSpeakingMessageId}
+        onSkipAudio={skipAudio}
+      />
 
       {session.phase === 'major_suggestions' && session.suggestedMajors.length > 0 && (
         <div className="px-6 pb-6">

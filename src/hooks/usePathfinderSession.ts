@@ -3,6 +3,7 @@ import type { SessionState, Message, Major, AudioState } from "../types";
 import { INTAKE_QUESTIONS } from "../types";
 import { speechRecognitionService } from "../services/speechService";
 import { textToSpeech, audioPlayer } from "../services/elevenLabsService";
+import { cleanTextForTTS } from "../lib/textCleaner";
 import {
   sendMessage,
   buildIntakeContext,
@@ -12,6 +13,11 @@ import {
 } from "../services/openaiService";
 import { getMajors, getCareersForMajor } from "../services/dataService";
 import { scoreMajors, updateUserProfile } from "../services/matchingService";
+import {
+  calculateRIASECScore,
+  getTopRIASECCodes,
+  getRIASECDescription,
+} from "../services/riasecService";
 
 const initialSessionState: SessionState = {
   phase: "welcome",
@@ -34,6 +40,7 @@ const initialSessionState: SessionState = {
 };
 
 export function usePathfinderSession() {
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [session, setSession] = useState<SessionState>(initialSessionState);
   const [audioState, setAudioState] = useState<AudioState>({
     isRecording: false,
@@ -69,6 +76,7 @@ export function usePathfinderSession() {
 
   const speakText = useCallback(
     async (text: string, messageId?: string) => {
+      if (!isVoiceEnabled) return;
       try {
         setSession((prev) => ({ ...prev, isAISpeaking: true }));
         setAudioState((prev) => ({ ...prev, isPlaying: true }));
@@ -76,8 +84,10 @@ export function usePathfinderSession() {
           setCurrentSpeakingMessageId(messageId);
         }
 
+        // Clean the text before sending to TTS
+        const cleanedText = cleanTextForTTS(text);
         const audioBuffer = await textToSpeech(
-          text,
+          cleanedText,
           session.selectedVoiceId || undefined
         );
         await audioPlayer.play(audioBuffer);
@@ -94,7 +104,7 @@ export function usePathfinderSession() {
         setTimeout(() => setError(null), 3000);
       }
     },
-    [session.selectedVoiceId]
+    [session.selectedVoiceId, isVoiceEnabled]
   );
 
   const processAIResponse = useCallback(
@@ -188,10 +198,37 @@ export function usePathfinderSession() {
             { conversationHistory: updatedHistory }
           );
         } else {
-          setSession((prev) => ({ ...prev, phase: "major_suggestions" }));
+          // All intake questions complete - calculate RIASEC score
+          const riasecScore = calculateRIASECScore(updatedProfile);
+          const topCodes = getTopRIASECCodes(riasecScore);
+          const description = getRIASECDescription(riasecScore);
+
+          // Log RIASEC results
+          console.log("=== RIASEC SCORE RESULTS ===");
+          console.log("Realistic (hands-on):", riasecScore.realistic);
+          console.log("Investigative (analytical):", riasecScore.investigative);
+          console.log("Artistic (creative):", riasecScore.artistic);
+          console.log("Social (helping):", riasecScore.social);
+          console.log("Enterprising (leading):", riasecScore.enterprising);
+          console.log("Conventional (organized):", riasecScore.conventional);
+          console.log("Top RIASEC Code:", topCodes);
+          console.log("Description:", description);
+          console.log("===========================");
+
+          // Update profile with RIASEC score
+          const profileWithRIASEC = {
+            ...updatedProfile,
+            riasecScore,
+          };
+
+          setSession((prev) => ({
+            ...prev,
+            phase: "major_suggestions",
+            userProfile: profileWithRIASEC,
+          }));
 
           const allMajors = await getMajors();
-          const scoredMajors = scoreMajors(allMajors, updatedProfile);
+          const scoredMajors = scoreMajors(allMajors, profileWithRIASEC);
 
           setSession((prev) => ({
             ...prev,
@@ -199,7 +236,7 @@ export function usePathfinderSession() {
           }));
 
           await processAIResponse(
-            () => buildMajorSuggestionContext(updatedProfile, scoredMajors),
+            () => buildMajorSuggestionContext(profileWithRIASEC, scoredMajors),
             { hideMessage: true, conversationHistory: updatedHistory }
           );
         }
@@ -319,12 +356,7 @@ export function usePathfinderSession() {
     }
   }, [session, processAIResponse]);
 
-  const skipAudio = useCallback(() => {
-    audioPlayer.stop();
-    setSession((prev) => ({ ...prev, isAISpeaking: false }));
-    setAudioState((prev) => ({ ...prev, isPlaying: false }));
-    setCurrentSpeakingMessageId(null);
-  }, []);
+  // skipAudio removed
 
   const restartSession = useCallback(() => {
     audioPlayer.stop();
@@ -408,7 +440,8 @@ export function usePathfinderSession() {
     goToSummary,
     restartSession,
     toggleRecording,
-    skipAudio,
     setSelectedVoice,
+    isVoiceEnabled,
+    setIsVoiceEnabled,
   };
 }

@@ -48,12 +48,22 @@ export interface IntakeQuestion {
   options?: string[];
 }
 
+export interface RIASECScore {
+  realistic: number;
+  investigative: number;
+  artistic: number;
+  social: number;
+  enterprising: number;
+  conventional: number;
+}
+
 export interface UserProfile {
   interests: string[];
   strengths: string[];
   values: string[];
   workStyle: string[];
   responses: Record<string, string>;
+  riasecScore?: RIASECScore;
 }
 
 export interface SessionState {
@@ -81,25 +91,60 @@ export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   {
     id: "q1",
     question:
-      "What subjects or activities do you find yourself naturally drawn to? What could you spend hours doing without getting bored?",
+      "What types of hands-on activities do you enjoy? (e.g., building, fixing, working outdoors, using tools)",
     type: "open",
   },
   {
     id: "q2",
     question:
-      "What are you naturally good at? What do friends and teachers often compliment you on?",
+      "Do you like solving puzzles, conducting research, or analyzing data? What topics interest you most?",
     type: "open",
   },
   {
     id: "q3",
     question:
-      "When you imagine your ideal work environment, what does it look like? Do you prefer working independently, in teams, outdoors, in an office, or something else?",
+      "How do you express your creativity? (e.g., art, music, writing, design)",
     type: "open",
   },
   {
     id: "q4",
     question:
-      "What matters most to you in a career? For example: helping others, creativity, solving problems, financial security, making an impact, or something else?",
+      "Do you enjoy helping, teaching, or supporting others? In what ways?",
+    type: "open",
+  },
+  {
+    id: "q5",
+    question:
+      "Do you like leading groups, persuading people, or taking initiative in projects?",
+    type: "open",
+  },
+  {
+    id: "q6",
+    question:
+      "Are you detail-oriented and enjoy organizing information, schedules, or systems?",
+    type: "open",
+  },
+  {
+    id: "q7",
+    question: "What school subjects or fields do you find most engaging?",
+    type: "open",
+  },
+  {
+    id: "q8",
+    question:
+      "Describe your ideal work environment (e.g., outdoors, lab, studio, office, with people, independently).",
+    type: "open",
+  },
+  {
+    id: "q9",
+    question:
+      "What are your career aspirations or dream jobs? What do you imagine yourself doing after college?",
+    type: "open",
+  },
+  {
+    id: "q10",
+    question:
+      "Is there anything else about your interests, strengths, or values that you want to share?",
     type: "open",
   },
 ];

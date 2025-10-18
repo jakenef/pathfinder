@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Mic, MicOff, Send, Volume2 } from 'lucide-react';
+import { useState } from "react";
+import { Mic, MicOff, Send, Volume2 } from "lucide-react";
 
 interface InputControlsProps {
   onSendMessage: (message: string) => void;
@@ -9,6 +9,8 @@ interface InputControlsProps {
   isProcessing: boolean;
   interimTranscript: string;
   isMicAvailable: boolean;
+  isVoiceEnabled: boolean;
+  setIsVoiceEnabled: (enabled: boolean) => void;
 }
 
 export function InputControls({
@@ -18,19 +20,21 @@ export function InputControls({
   isAISpeaking,
   isProcessing,
   interimTranscript,
-  isMicAvailable
+  isMicAvailable,
+  isVoiceEnabled,
+  setIsVoiceEnabled,
 }: InputControlsProps) {
-  const [textInput, setTextInput] = useState('');
+  const [textInput, setTextInput] = useState("");
 
   const handleSendText = () => {
     if (textInput.trim() && !isProcessing && !isAISpeaking) {
       onSendMessage(textInput.trim());
-      setTextInput('');
+      setTextInput("");
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendText();
     }
@@ -62,18 +66,27 @@ export function InputControls({
         )}
 
         <div className="flex items-end gap-3">
+          <label className="flex items-center gap-2 mb-2">
+            <input
+              type="checkbox"
+              checked={isVoiceEnabled}
+              onChange={(e) => setIsVoiceEnabled(e.target.checked)}
+              className="form-checkbox h-4 w-4 text-blue-600"
+            />
+            <span className="text-sm text-gray-700">Enable Voice (TTS)</span>
+          </label>
           {isMicAvailable && (
             <button
               onClick={handleMicClick}
               disabled={isDisabled}
               className={`flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 ${
                 isRecording
-                  ? 'bg-red-500 hover:bg-red-600 shadow-lg scale-110'
+                  ? "bg-red-500 hover:bg-red-600 shadow-lg scale-110"
                   : isDisabled
-                  ? 'bg-gray-300 cursor-not-allowed'
-                  : 'bg-blue-500 hover:bg-blue-600 shadow-md hover:scale-105'
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-500 hover:bg-blue-600 shadow-md hover:scale-105"
               }`}
-              title={isRecording ? 'Stop recording' : 'Start recording'}
+              title={isRecording ? "Stop recording" : "Start recording"}
             >
               {isRecording ? (
                 <MicOff className="w-6 h-6 text-white" />
@@ -90,17 +103,17 @@ export function InputControls({
               onKeyPress={handleKeyPress}
               placeholder={
                 isAISpeaking
-                  ? 'Wait for Pathfinder to finish speaking...'
+                  ? "Wait for Pathfinder to finish speaking..."
                   : isProcessing
-                  ? 'Processing...'
+                  ? "Processing..."
                   : isMicAvailable
-                  ? 'Type your message or use the mic...'
-                  : 'Type your message...'
+                  ? "Type your message or use the mic..."
+                  : "Type your message..."
               }
               disabled={isDisabled}
               rows={1}
               className="flex-1 px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-              style={{ minHeight: '56px', maxHeight: '120px' }}
+              style={{ minHeight: "56px", maxHeight: "120px" }}
             />
 
             <button
@@ -116,8 +129,8 @@ export function InputControls({
 
         <p className="mt-2 text-xs text-gray-500 text-center">
           {isMicAvailable
-            ? 'Click the mic to speak, or type your response. Press Enter to send.'
-            : 'Microphone not available. Type your response and press Enter to send.'}
+            ? "Click the mic to speak, or type your response. Press Enter to send."
+            : "Microphone not available. Type your response and press Enter to send."}
         </p>
       </div>
     </div>

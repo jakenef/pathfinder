@@ -73,12 +73,13 @@ export function usePathfinderSession() {
     }
   }, []);
 
-  const processAIResponse = useCallback(async (contextBuilder: () => string, options?: { hideMessage?: boolean }) => {
+  const processAIResponse = useCallback(async (contextBuilder: () => string, options?: { hideMessage?: boolean, conversationHistory?: Array<{role: 'user' | 'assistant', content: string}> }) => {
     try {
       setSession(prev => ({ ...prev, isProcessing: true }));
 
       const context = contextBuilder();
-      const response = await sendMessage(session.conversationHistory, context);
+      const historyToUse = options?.conversationHistory || session.conversationHistory;
+      const response = await sendMessage(historyToUse, context);
 
       if (!options?.hideMessage) {
         addMessage('assistant', response);
@@ -99,6 +100,9 @@ export function usePathfinderSession() {
 
     addMessage('user', userMessage);
 
+    // Create updated conversation history immediately
+    const updatedHistory = [...session.conversationHistory, { role: 'user' as const, content: userMessage }];
+
     if (session.phase === 'intake') {
       const currentQuestion = INTAKE_QUESTIONS[session.currentQuestionIndex];
       const updatedProfile = updateUserProfile(session.userProfile, currentQuestion.id, userMessage);
@@ -113,7 +117,8 @@ export function usePathfinderSession() {
         setSession(prev => ({ ...prev, currentQuestionIndex: nextIndex }));
 
         await processAIResponse(() =>
-          buildIntakeContext(nextIndex, INTAKE_QUESTIONS.length, updatedProfile)
+          buildIntakeContext(nextIndex, INTAKE_QUESTIONS.length, updatedProfile),
+          { conversationHistory: updatedHistory }
         );
       } else {
         setSession(prev => ({ ...prev, phase: 'major_suggestions' }));
@@ -128,7 +133,7 @@ export function usePathfinderSession() {
 
         await processAIResponse(() =>
           buildMajorSuggestionContext(updatedProfile, scoredMajors),
-          { hideMessage: true }
+          { hideMessage: true, conversationHistory: updatedHistory }
         );
       }
     } else if (session.phase === 'major_suggestions' || session.phase === 'career_suggestions') {
@@ -139,7 +144,7 @@ export function usePathfinderSession() {
           return buildCareerSuggestionContext(session.userProfile, session.selectedMajor, session.suggestedCareers);
         }
         return '';
-      });
+      }, { conversationHistory: updatedHistory });
     }
   }, [session, addMessage, processAIResponse]);
 
@@ -210,7 +215,8 @@ export function usePathfinderSession() {
           if (isFinal) {
             transcriptRef.current += transcript + ' ';
             setFinalTranscript(transcriptRef.current.trim());
-            setInterimTranscript('');
+            // Keep showing accumulated text even after finalization
+            setInterimTranscript(transcriptRef.current.trim());
           } else {
             // Show accumulated text + current interim text
             const fullDisplay = transcriptRef.current + transcript;

@@ -21,6 +21,7 @@ import {
 } from "../services/riasecService";
 import { findMatchingCareers } from "../services/careerMatchingService";
 import { getMajorsForCareer } from "../services/careerMajorMatchingService";
+import { enrichCareersWithConversation } from "../services/conversationCareerService";
 
 const initialSessionState: SessionState = {
   phase: "welcome",
@@ -228,13 +229,22 @@ export function usePathfinderSession() {
           };
 
           // Find matching careers based on RIASEC score
-          const matchedCareers = await findMatchingCareers(riasecScore);
+          const riasecCareers = await findMatchingCareers(riasecScore);
+
+          // Enrich with conversation-mentioned careers
+          const { careers: finalCareers, source } = await enrichCareersWithConversation(
+            updatedHistory,
+            riasecCareers,
+            riasecScore
+          );
+
+          console.log(`\n🎯 Using careers from: ${source}`);
 
           setSession((prev) => ({
             ...prev,
             phase: "major_suggestions",
             userProfile: profileWithRIASEC,
-            matchedSOCCareers: matchedCareers,
+            matchedSOCCareers: finalCareers,
           }));
 
           const allMajors = await getMajors();
@@ -420,7 +430,14 @@ export function usePathfinderSession() {
     };
 
     // Find matching careers based on demo RIASEC score
-    const matchedCareers = await findMatchingCareers(demoRIASECScore);
+    const riasecCareers = await findMatchingCareers(demoRIASECScore);
+
+    // For demo, no conversation history, so just use RIASEC careers
+    const { careers: finalCareers } = await enrichCareersWithConversation(
+      [],
+      riasecCareers,
+      demoRIASECScore
+    );
 
     // Get and score majors
     const allMajors = await getMajors();
@@ -429,7 +446,7 @@ export function usePathfinderSession() {
     setSession((prev) => ({
       ...prev,
       userProfile: demoProfile,
-      matchedSOCCareers: matchedCareers,
+      matchedSOCCareers: finalCareers,
       suggestedMajors: scoredMajors,
     }));
 

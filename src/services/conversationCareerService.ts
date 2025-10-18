@@ -209,6 +209,71 @@ async function fallbackCareerExtraction(keywords: ExtractedKeywords): Promise<Co
   }
 }
 
+interface SOCMatch {
+  soc: SOCCareer;
+  score: number;
+  matchType: string;
+}
+
+function scoreSOCMatch(soc: { title: string; description: string }, searchTerm: string): SOCMatch | null {
+  const lowerTitle = soc.title.toLowerCase();
+  const lowerDescription = soc.description?.toLowerCase() || '';
+  const lowerSearch = searchTerm.toLowerCase();
+
+  const searchWords = lowerSearch.split(/\s+/).filter(w => w.length > 2);
+  const titleWords = lowerTitle.split(/\s+/);
+
+  let score = 0;
+  let matchType = '';
+
+  if (lowerTitle === lowerSearch) {
+    score = 1000;
+    matchType = 'exact title match';
+  }
+  else if (lowerTitle.includes(lowerSearch)) {
+    score = 900;
+    matchType = 'title contains full phrase';
+  }
+  else if (lowerSearch.includes(lowerTitle)) {
+    score = 850;
+    matchType = 'search contains full title';
+  }
+  else {
+    const titleWordMatches = searchWords.filter(word => titleWords.some(tw =>
+      tw === word || tw.startsWith(word) || word.startsWith(tw)
+    ));
+
+    if (titleWordMatches.length === searchWords.length) {
+      score = 800 + (titleWordMatches.length * 10);
+      matchType = `all ${searchWords.length} keywords in title`;
+    }
+    else if (titleWordMatches.length > 0) {
+      score = 500 + (titleWordMatches.length * 50);
+      matchType = `${titleWordMatches.length}/${searchWords.length} keywords in title`;
+    }
+    else if (lowerDescription.includes(lowerSearch)) {
+      score = 300;
+      matchType = 'description contains full phrase';
+    }
+    else {
+      const descWordMatches = searchWords.filter(word => lowerDescription.includes(word));
+
+      if (descWordMatches.length > 0) {
+        score = 100 + (descWordMatches.length * 20);
+        matchType = `${descWordMatches.length}/${searchWords.length} keywords in description`;
+      } else {
+        return null;
+      }
+    }
+  }
+
+  return {
+    soc: soc as SOCCareer,
+    score,
+    matchType
+  };
+}
+
 async function findSOCCodeForCareer(careerTitle: string): Promise<SOCCareer | null> {
   console.log(`\n🔍 Finding SOC code for: "${careerTitle}"`);
 
@@ -222,37 +287,38 @@ async function findSOCCodeForCareer(careerTitle: string): Promise<SOCCareer | nu
       return null;
     }
 
-    const lowerCareerTitle = careerTitle.toLowerCase();
+    const scoredMatches: SOCMatch[] = [];
 
-    const exactMatch = allSOCs.find(soc =>
-      soc.title.toLowerCase() === lowerCareerTitle
-    );
-
-    if (exactMatch) {
-      console.log(`✅ Exact match found: ${exactMatch.title} (${exactMatch.soc_code})`);
-      return exactMatch;
+    for (const soc of allSOCs) {
+      const match = scoreSOCMatch(soc, careerTitle);
+      if (match) {
+        scoredMatches.push(match);
+      }
     }
 
-    const partialMatch = allSOCs.find(soc =>
-      soc.title.toLowerCase().includes(lowerCareerTitle) ||
-      lowerCareerTitle.includes(soc.title.toLowerCase())
-    );
-
-    if (partialMatch) {
-      console.log(`✅ Partial match found: ${partialMatch.title} (${partialMatch.soc_code})`);
-      return partialMatch;
+    if (scoredMatches.length === 0) {
+      console.log('❌ No matches found in SOC database');
+      return null;
     }
 
-    console.log('Searching in SOC descriptions for keyword matches...');
-    const keywordMatches = allSOCs.filter(soc => {
-      const searchText = `${soc.title} ${soc.description}`.toLowerCase();
-      const careerWords = lowerCareerTitle.split(' ').filter(w => w.length > 3);
-      return careerWords.some(word => searchText.includes(word));
-    });
+    scoredMatches.sort((a, b) => b.score - a.score);
 
-    if (keywordMatches.length > 0) {
-      console.log(`✅ Found ${keywordMatches.length} description matches, using top result: ${keywordMatches[0].title}`);
-      return keywordMatches[0];
+    console.log(`\n✅ Found ${scoredMatches.length} matches, using top result: ${scoredMatches[0].soc.title}`);
+    console.log(`   Match type: ${scoredMatches[0].matchType} (score: ${scoredMatches[0].score})`);
+
+    if (scoredMatches.length > 1) {
+      console.log(`\n   Other top matches:`);
+      scoredMatches.slice(1, 6).forEach((match, idx) => {
+        console.log(`   ${idx + 2}. ${match.soc.title} (${match.matchType}, score: ${match.score})`);
+      });
+    }
+
+    const bestMatch = scoredMatches[0].soc;
+
+    if (scoredMatches[0].score < 200) {
+      console.log(`   ⚠️ Low confidence match (score: ${scoredMatches[0].score}), using AI fallback...`);
+    } else {
+      return bestMatch;
     }
 
     const prompt = `Given this career title: "${careerTitle}"

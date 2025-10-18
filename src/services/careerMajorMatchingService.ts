@@ -223,14 +223,17 @@ IMPORTANT:
     const matches: CareerMajorMatch[] = [];
 
     for (const selection of aiSelections) {
+      const cleanCipCode = selection.cipCode?.replace(/[\[\]]/g, '').trim();
+
       const major = allMajors.find(m =>
+        m.id === cleanCipCode ||
         m.id === selection.cipCode ||
         m.name.toLowerCase() === selection.majorName.toLowerCase() ||
         m.name.toLowerCase().includes(selection.majorName.toLowerCase().substring(0, 20))
       );
 
       if (major) {
-        console.log(`✅ Matched: "${selection.majorName}" -> ${major.name}`);
+        console.log(`✅ Matched: "${selection.majorName}" -> ${major.name} (CIP: ${major.id})`);
         matches.push({
           major,
           matchScore: 10,

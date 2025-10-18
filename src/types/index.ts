@@ -1,6 +1,11 @@
-export type ConversationPhase = 'welcome' | 'intake' | 'major_suggestions' | 'career_suggestions' | 'summary';
+export type ConversationPhase =
+  | "welcome"
+  | "intake"
+  | "major_suggestions"
+  | "career_suggestions"
+  | "summary";
 
-export type MessageRole = 'user' | 'assistant';
+export type MessageRole = "user" | "assistant";
 
 export interface Message {
   id: string;
@@ -39,7 +44,7 @@ export interface Career {
 export interface IntakeQuestion {
   id: string;
   question: string;
-  type: 'open' | 'multiple_choice';
+  type: "open" | "multiple_choice";
   options?: string[];
 }
 
@@ -59,9 +64,11 @@ export interface SessionState {
   suggestedMajors: Major[];
   selectedMajor: Major | null;
   suggestedCareers: Career[];
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
   isAISpeaking: boolean;
   isProcessing: boolean;
+  // Selected ElevenLabs voice for TTS
+  selectedVoiceId?: string | null;
 }
 
 export interface AudioState {
@@ -72,31 +79,35 @@ export interface AudioState {
 
 export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   {
-    id: 'q1',
-    question: "What subjects or activities do you find yourself naturally drawn to? What could you spend hours doing without getting bored?",
-    type: 'open'
+    id: "q1",
+    question:
+      "What subjects or activities do you find yourself naturally drawn to? What could you spend hours doing without getting bored?",
+    type: "open",
   },
   {
-    id: 'q2',
-    question: "What are you naturally good at? What do friends and teachers often compliment you on?",
-    type: 'open'
+    id: "q2",
+    question:
+      "What are you naturally good at? What do friends and teachers often compliment you on?",
+    type: "open",
   },
   {
-    id: 'q3',
-    question: "When you imagine your ideal work environment, what does it look like? Do you prefer working independently, in teams, outdoors, in an office, or something else?",
-    type: 'open'
+    id: "q3",
+    question:
+      "When you imagine your ideal work environment, what does it look like? Do you prefer working independently, in teams, outdoors, in an office, or something else?",
+    type: "open",
   },
   {
-    id: 'q4',
-    question: "What matters most to you in a career? For example: helping others, creativity, solving problems, financial security, making an impact, or something else?",
-    type: 'open'
-  }
+    id: "q4",
+    question:
+      "What matters most to you in a career? For example: helping others, creativity, solving problems, financial security, making an impact, or something else?",
+    type: "open",
+  },
 ];
 
 export const PROGRESS_PHASES = [
-  { phase: 'welcome', label: 'Welcome', weight: 0 },
-  { phase: 'intake', label: 'Getting to Know You', weight: 40 },
-  { phase: 'major_suggestions', label: 'Exploring Majors', weight: 25 },
-  { phase: 'career_suggestions', label: 'Career Paths', weight: 25 },
-  { phase: 'summary', label: 'Your Roadmap', weight: 10 }
+  { phase: "welcome", label: "Welcome", weight: 0 },
+  { phase: "intake", label: "Getting to Know You", weight: 40 },
+  { phase: "major_suggestions", label: "Exploring Majors", weight: 25 },
+  { phase: "career_suggestions", label: "Career Paths", weight: 25 },
+  { phase: "summary", label: "Your Roadmap", weight: 10 },
 ] as const;

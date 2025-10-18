@@ -72,6 +72,21 @@ export interface UserProfile {
   values: string[];
   workStyle: string[];
   responses: Record<string, string>;
+  riasecScores: {
+    realistic: number;
+    investigative: number;
+    artistic: number;
+    social: number;
+    enterprising: number;
+    conventional: number;
+  };
+  bigFiveTraits: {
+    openness: number;
+    conscientiousness: number;
+    extraversion: number;
+    agreeableness: number;
+    emotionalStability: number;
+  };
   riasecScore?: RIASECScore;
 }
 

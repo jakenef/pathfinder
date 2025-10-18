@@ -33,6 +33,21 @@ const initialSessionState: SessionState = {
     values: [],
     workStyle: [],
     responses: {},
+    riasecScores: {
+      realistic: 0,
+      investigative: 0,
+      artistic: 0,
+      social: 0,
+      enterprising: 0,
+      conventional: 0,
+    },
+    bigFiveTraits: {
+      openness: 0,
+      conscientiousness: 0,
+      extraversion: 0,
+      agreeableness: 0,
+      emotionalStability: 0,
+    },
   },
   suggestedMajors: [],
   selectedMajor: null,
@@ -399,88 +414,115 @@ export function usePathfinderSession() {
       // Show loading state
       setSession((prev) => ({ ...prev, isProcessing: true }));
 
-      // Generate demo RIASEC score (random)
-      const demoRIASECScore = generateDemoRIASECScore();
-      const topCodes = getTopRIASECCodes(demoRIASECScore);
-      const description = getRIASECDescription(demoRIASECScore);
+      // Generate random RIASEC scores (0-5 range with at least 2 strong types)
+      const generateRandomRIASEC = () => {
+        const scores = {
+          realistic: Math.floor(Math.random() * 6),
+          investigative: Math.floor(Math.random() * 6),
+          artistic: Math.floor(Math.random() * 6),
+          social: Math.floor(Math.random() * 6),
+          enterprising: Math.floor(Math.random() * 6),
+          conventional: Math.floor(Math.random() * 6),
+        };
 
-      console.log("=== DEMO RIASEC SCORE ===");
-      console.log("Realistic (hands-on):", demoRIASECScore.realistic);
-      console.log("Investigative (analytical):", demoRIASECScore.investigative);
-      console.log("Artistic (creative):", demoRIASECScore.artistic);
-      console.log("Social (helping):", demoRIASECScore.social);
-      console.log("Enterprising (leading):", demoRIASECScore.enterprising);
-      console.log("Conventional (organized):", demoRIASECScore.conventional);
-      console.log("Top RIASEC Code:", topCodes);
-      console.log("Description:", description);
-      console.log("========================");
+        // Ensure at least 2 types have scores >= 3
+        const types = Object.keys(scores) as Array<keyof typeof scores>;
+        const highScoreTypes = types.filter(t => scores[t] >= 3);
+        if (highScoreTypes.length < 2) {
+          const randomTypes = types.sort(() => Math.random() - 0.5).slice(0, 2);
+          randomTypes.forEach(t => {
+            scores[t] = 3 + Math.floor(Math.random() * 3);
+          });
+        }
 
-      // Create a demo profile with random RIASEC score
-      const demoProfile = {
-        interests: ["technology", "problem-solving", "creativity"],
-        strengths: ["analytical thinking", "communication"],
-        values: ["innovation", "impact"],
-        workStyle: ["collaborative", "flexible"],
-        responses: {},
-        riasecScore: demoRIASECScore,
+        return scores;
       };
 
-      console.log("Fetching careers and majors...");
+      // Generate random Big Five traits (-3 to +3 range)
+      const generateRandomBigFive = () => ({
+        openness: Math.floor(Math.random() * 7) - 3,
+        conscientiousness: Math.floor(Math.random() * 7) - 3,
+        extraversion: Math.floor(Math.random() * 7) - 3,
+        agreeableness: Math.floor(Math.random() * 7) - 3,
+        emotionalStability: Math.floor(Math.random() * 7) - 3,
+      });
 
-      // TEST: Check if database has data
-      const { data: testMajors, error: testMajorsError } = await supabase
-        .from("general_majors")
-        .select("cip_code")
-        .limit(1);
+      const demoRIASECScores = generateRandomRIASEC();
+      const demoBigFive = generateRandomBigFive();
 
-      const { data: testCareers, error: testCareersError } = await supabase
-        .from("soc_basics")
-        .select("soc_code")
-        .limit(1);
+      // Get top RIASEC types for description
+      const topTypes = Object.entries(demoRIASECScores)
+        .filter(([_, score]) => score >= 3)
+        .sort(([_, a], [__, b]) => b - a)
+        .slice(0, 3)
+        .map(([type]) => type);
 
-      console.log("=== DATABASE TEST ===");
-      console.log(
-        "general_majors test:",
-        testMajorsError
-          ? `ERROR: ${testMajorsError.message}`
-          : `OK (${testMajors?.length || 0} records)`
-      );
-      console.log(
-        "soc_basics test:",
-        testCareersError
-          ? `ERROR: ${testCareersError.message}`
-          : `OK (${testCareers?.length || 0} records)`
-      );
-      console.log("====================");
+      console.log("=== DEMO PERSONALITY PROFILE ===");
+      console.log("RIASEC Scores:", demoRIASECScores);
+      console.log("Top RIASEC Types:", topTypes);
+      console.log("Big Five Traits:", demoBigFive);
+      console.log("================================");
 
-      // Fetch matching careers and majors in parallel
-      const [matchedCareers, allMajors] = await Promise.all([
-        findMatchingCareers(demoRIASECScore),
-        getMajors(),
-      ]);
+      // Create a demo profile with random personality scores
+      const demoProfile = {
+        interests: ["technology", "problem-solving", "creativity", "helping others"],
+        strengths: ["analytical thinking", "communication", "organization"],
+        values: ["innovation", "impact", "growth"],
+        workStyle: ["collaborative", "flexible", "detail-oriented"],
+        responses: {
+          q1_interests: "I enjoy a mix of creative and analytical work",
+          q2_strengths: "I'm good at problem-solving and working with people",
+          q3_work_style: "I prefer collaborative environments with some structure",
+          q4_learning: "I like hands-on learning combined with theory",
+          q5_decisions: "I consider both logic and impact on people",
+          q6_environment: "Dynamic, people-focused environments",
+          q7_values: "Making a positive impact and continuous learning",
+          q8_challenges: "Complex problems that help others"
+        },
+        riasecScores: demoRIASECScores,
+        bigFiveTraits: demoBigFive,
+      };
 
-      console.log("=== DATA FETCH RESULTS ===");
-      console.log("Matched careers count:", matchedCareers.length);
-      console.log("Matched careers:", matchedCareers);
-      console.log("All majors count:", allMajors.length);
+      console.log("Fetching majors from database...");
+
+      // Fetch all majors and score them
+      const allMajors = await getMajors();
+      console.log("All majors fetched:", allMajors.length);
 
       // Score majors based on demo profile
       const scoredMajors = scoreMajors(allMajors, demoProfile);
+      console.log("Scored majors:", scoredMajors.length);
+      console.log("Top 3 majors:", scoredMajors.slice(0, 3).map(m => ({ name: m.name, score: m.matchScore })));
 
-      console.log("Scored majors count:", scoredMajors.length);
-      console.log("=========================");
+      // Create personality description
+      const riasecDescriptions: { [key: string]: string } = {
+        realistic: 'hands-on and practical',
+        investigative: 'analytical and research-oriented',
+        artistic: 'creative and expressive',
+        social: 'people-focused and collaborative',
+        enterprising: 'leadership-driven and persuasive',
+        conventional: 'organized and detail-oriented'
+      };
 
-      // Add a welcome message with RIASEC info
+      const topRiasecDesc = topTypes.map(t => riasecDescriptions[t]).join(', ');
+
+      const bigFiveDesc = [];
+      if (demoBigFive.openness > 1) bigFiveDesc.push('curious and open to new ideas');
+      if (demoBigFive.conscientiousness > 1) bigFiveDesc.push('organized and disciplined');
+      if (demoBigFive.extraversion > 1) bigFiveDesc.push('energized by people');
+      if (demoBigFive.agreeableness > 1) bigFiveDesc.push('empathetic and collaborative');
+      if (demoBigFive.emotionalStability > 1) bigFiveDesc.push('calm under pressure');
+
+      // Add a welcome message with personality info
       const welcomeMessage: Message = {
         id: `${Date.now()}-${Math.random()}`,
         role: "assistant",
-        content: `Welcome to the demo! I've generated a sample profile for you with the RIASEC code ${topCodes}. ${description}\n\nBelow, you'll find career matches based on this profile. Click any career to see which majors will help you get there!`,
+        content: `Welcome to the demo! I've created a sample personality profile for you.\n\n🎯 Your Demo Personality:\n- Work Style: ${topRiasecDesc}\n${bigFiveDesc.length > 0 ? `- Traits: ${bigFiveDesc.join(', ')}\n` : ''}\nBelow are your top major matches based on this profile. Each card shows why it's a good fit for your personality type!`,
         timestamp: new Date(),
       };
 
       console.log("Setting session state with:", {
         phase: "major_suggestions",
-        matchedSOCCareers: matchedCareers.length,
         suggestedMajors: scoredMajors.length,
       });
 
@@ -489,7 +531,6 @@ export function usePathfinderSession() {
         ...prev,
         phase: "major_suggestions",
         userProfile: demoProfile,
-        matchedSOCCareers: matchedCareers,
         suggestedMajors: scoredMajors,
         messages: [welcomeMessage],
         conversationHistory: [

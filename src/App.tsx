@@ -21,8 +21,9 @@ function App() {
     goToSummary,
     restartSession,
     toggleRecording,
-    skipAudio,
     setSelectedVoice,
+    isVoiceEnabled,
+    setIsVoiceEnabled,
   } = usePathfinderSession();
 
   if (session.phase === "welcome") {
@@ -76,7 +77,6 @@ function App() {
         messages={session.messages}
         isProcessing={session.isProcessing}
         currentSpeakingMessageId={currentSpeakingMessageId}
-        onSkipAudio={skipAudio}
       />
 
       {session.phase === "major_suggestions" &&
@@ -134,6 +134,8 @@ function App() {
         isProcessing={session.isProcessing}
         interimTranscript={interimTranscript}
         isMicAvailable={audioState.isMicAvailable}
+        isVoiceEnabled={isVoiceEnabled}
+        setIsVoiceEnabled={setIsVoiceEnabled}
       />
     </div>
   );

@@ -1,21 +1,24 @@
-import { useEffect, useRef } from 'react';
-import type { Message } from '../types';
-import { ChatMessage } from './ChatMessage';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useRef } from "react";
+import type { Message } from "../types";
+import { ChatMessage } from "./ChatMessage";
+import { Loader2 } from "lucide-react";
 
 interface ChatInterfaceProps {
   messages: Message[];
   isProcessing: boolean;
   currentSpeakingMessageId?: string | null;
-  onSkipAudio?: () => void;
 }
 
-export function ChatInterface({ messages, isProcessing, currentSpeakingMessageId, onSkipAudio }: ChatInterfaceProps) {
+export function ChatInterface({
+  messages,
+  isProcessing,
+  currentSpeakingMessageId,
+}: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -33,7 +36,7 @@ export function ChatInterface({ messages, isProcessing, currentSpeakingMessageId
             key={message.id}
             message={message}
             isAudioPlaying={currentSpeakingMessageId === message.id}
-            onSkipAudio={onSkipAudio}
+            // Skip button removed
           />
         ))}
 
@@ -45,9 +48,18 @@ export function ChatInterface({ messages, isProcessing, currentSpeakingMessageId
             <div className="flex-1 max-w-2xl">
               <div className="inline-block px-4 py-3 rounded-2xl bg-white shadow-sm border border-gray-100">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div
+                    className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <div
+                    className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <div
+                    className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  />
                 </div>
               </div>
             </div>

@@ -46,19 +46,21 @@ export function MajorCard({ major, onSelect, isSelected = false }: MajorCardProp
           </div>
         )}
 
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Skills:</h4>
-          <div className="flex flex-wrap gap-2">
-            {major.key_skills.slice(0, 4).map((skill, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full"
-              >
-                {skill}
-              </span>
-            ))}
+        {major.key_skills && major.key_skills.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Skills:</h4>
+            <div className="flex flex-wrap gap-2">
+              {major.key_skills.slice(0, 4).map((skill, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <button
           onClick={() => onSelect(major)}

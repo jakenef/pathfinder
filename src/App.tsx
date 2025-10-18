@@ -25,6 +25,7 @@ function App() {
     setSelectedVoice,
     isVoiceEnabled,
     setIsVoiceEnabled,
+    toggleCareerExpansion,
   } = usePathfinderSession();
 
   if (session.phase === "welcome") {
@@ -82,61 +83,121 @@ function App() {
       />
 
       {session.phase === "major_suggestions" &&
-        session.suggestedMajors.length > 0 && (
+        session.matchedSOCCareers.length > 0 && (
           <div className="px-6 pb-6">
-            <div className="max-w-4xl mx-auto space-y-8">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="mb-2">
+                <h2 className="text-2xl font-bold text-gray-900">
                   Your Top Career Matches
                 </h2>
-                {session.matchedSOCCareers.length > 0 && (
-                  <div className="grid md:grid-cols-2 gap-4 mb-6">
-                    {session.matchedSOCCareers.slice(0, 4).map((career) => (
-                      <div
-                        key={career.soc_code}
-                        className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 p-6 border border-gray-100"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <h3 className="text-lg font-semibold text-gray-900 leading-tight">
-                            {career.title}
-                          </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Click any career to see which majors will help you get there
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                {session.matchedSOCCareers.slice(0, 4).map((career) => (
+                  <div key={career.soc_code} id={`career-${career.soc_code}`}>
+                    <button
+                      onClick={() => {
+                        toggleCareerExpansion(
+                          career.soc_code,
+                          career.title,
+                          career.description
+                        );
+                        setTimeout(() => {
+                          const element = document.getElementById(
+                            `career-${career.soc_code}`
+                          );
+                          if (
+                            element &&
+                            session.expandedCareerCode !== career.soc_code
+                          ) {
+                            element.scrollIntoView({
+                              behavior: "smooth",
+                              block: "nearest",
+                            });
+                          }
+                        }, 100);
+                      }}
+                      disabled={session.isProcessing}
+                      className="w-full text-left bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 p-6 border-2 border-gray-100 hover:border-blue-300 disabled:hover:border-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                          {career.title}
+                        </h3>
+                        <div className="flex flex-col gap-1 ml-2">
                           {career.matchScore && !career.isRelated && (
-                            <span className="ml-2 px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex-shrink-0">
+                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex-shrink-0">
                               Top Match
                             </span>
                           )}
                           {career.isRelated && (
-                            <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full flex-shrink-0">
+                            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full flex-shrink-0">
                               Related
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
-                          {career.description}
-                        </p>
-                        <div className="mt-3 text-xs text-gray-500">
-                          SOC Code: {career.soc_code}
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                        {career.description}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          SOC Code: {career.soc_code}
+                        </span>
+                        <span className="text-xs font-medium text-blue-600">
+                          {session.expandedCareerCode === career.soc_code
+                            ? "Click to collapse ▲"
+                            : "Click to explore →"}
+                        </span>
+                      </div>
+                    </button>
 
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Your Top Major Matches
-                </h2>
-                <div className="grid md:grid-cols-2 gap-4 mb-6">
-                  {session.suggestedMajors.map((major) => (
-                    <MajorCard
-                      key={major.id}
-                      major={major}
-                      onSelect={selectMajor}
-                      isSelected={session.selectedMajor?.id === major.id}
-                    />
-                  ))}
-                </div>
+                    {session.expandedCareerCode === career.soc_code && (
+                      <div className="mt-4 pl-4 border-l-4 border-blue-300">
+                        {session.isProcessing &&
+                        !session.careerSpecificMajors[career.soc_code] ? (
+                          <div className="bg-blue-50 rounded-lg p-6 text-center">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <p className="mt-2 text-sm text-gray-600">
+                              Finding the best majors for this career...
+                            </p>
+                          </div>
+                        ) : session.careerSpecificMajors[career.soc_code]
+                            ?.length > 0 ? (
+                          <div>
+                            <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                              Majors that lead to {career.title}
+                            </h4>
+                            <div className="space-y-3">
+                              {session.careerSpecificMajors[
+                                career.soc_code
+                              ].map((major) => (
+                                <MajorCard
+                                  key={major.id}
+                                  major={major}
+                                  onSelect={selectMajor}
+                                  isSelected={
+                                    session.selectedMajor?.id === major.id
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                            <p className="text-sm text-gray-700">
+                              We couldn't find specific major matches for this
+                              career. Try exploring other careers or contact an
+                              advisor for personalized guidance.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

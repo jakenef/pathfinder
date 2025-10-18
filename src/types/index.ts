@@ -47,6 +47,7 @@ export interface SOCCareer {
   description: string;
   matchScore?: number;
   isRelated?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface IntakeQuestion {
@@ -83,6 +84,8 @@ export interface SessionState {
   selectedMajor: Major | null;
   suggestedCareers: Career[];
   matchedSOCCareers: SOCCareer[];
+  expandedCareerCode: string | null;
+  careerSpecificMajors: Record<string, Major[]>;
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
   isAISpeaking: boolean;
   isProcessing: boolean;

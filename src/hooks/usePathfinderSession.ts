@@ -20,6 +20,7 @@ import {
   generateDemoRIASECScore,
 } from "../services/riasecService";
 import { findMatchingCareers } from "../services/careerMatchingService";
+import { getMajorsForCareer } from "../services/careerMajorMatchingService";
 
 const initialSessionState: SessionState = {
   phase: "welcome",
@@ -36,6 +37,8 @@ const initialSessionState: SessionState = {
   selectedMajor: null,
   suggestedCareers: [],
   matchedSOCCareers: [],
+  expandedCareerCode: null,
+  careerSpecificMajors: {},
   conversationHistory: [],
   isAISpeaking: false,
   isProcessing: false,
@@ -500,6 +503,62 @@ export function usePathfinderSession() {
     [session.isAISpeaking, session.isProcessing, handleUserMessage]
   );
 
+  const toggleCareerExpansion = useCallback(
+    async (socCode: string, careerTitle: string, careerDescription: string) => {
+      if (session.isProcessing) return;
+
+      if (session.expandedCareerCode === socCode) {
+        setSession((prev) => ({
+          ...prev,
+          expandedCareerCode: null,
+        }));
+        return;
+      }
+
+      setSession((prev) => ({
+        ...prev,
+        expandedCareerCode: socCode,
+        isProcessing: true,
+      }));
+
+      if (session.careerSpecificMajors[socCode]) {
+        setSession((prev) => ({
+          ...prev,
+          isProcessing: false,
+        }));
+        return;
+      }
+
+      try {
+        const majors = await getMajorsForCareer(
+          socCode,
+          careerTitle,
+          careerDescription,
+          session.userProfile
+        );
+
+        setSession((prev) => ({
+          ...prev,
+          careerSpecificMajors: {
+            ...prev.careerSpecificMajors,
+            [socCode]: majors,
+          },
+          isProcessing: false,
+        }));
+      } catch (error) {
+        console.error('Error fetching career-specific majors:', error);
+        setSession((prev) => ({
+          ...prev,
+          isProcessing: false,
+          expandedCareerCode: null,
+        }));
+        setError('Failed to load majors for this career. Please try again.');
+        setTimeout(() => setError(null), 3000);
+      }
+    },
+    [session.expandedCareerCode, session.careerSpecificMajors, session.userProfile, session.isProcessing]
+  );
+
   useEffect(() => {
     return () => {
       audioPlayer.stop();
@@ -523,5 +582,6 @@ export function usePathfinderSession() {
     setSelectedVoice,
     isVoiceEnabled,
     setIsVoiceEnabled,
+    toggleCareerExpansion,
   };
 }

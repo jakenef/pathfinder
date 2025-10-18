@@ -40,7 +40,13 @@ async function scoreMajorsForCareer(
   majors: Major[],
   userProfile: UserProfile
 ): Promise<CareerMajorMatch[]> {
+  console.log('\n=== SCORING MAJORS FOR CAREER ===');
+  console.log('Career Title:', careerTitle);
+  console.log('Career Description:', careerDescription.substring(0, 200));
+  console.log('Total majors to evaluate:', majors.length);
+
   const careerKeywords = extractKeywords(`${careerTitle} ${careerDescription}`);
+  console.log('Career keywords extracted:', Array.from(careerKeywords).slice(0, 10));
 
   const scoredMajors = majors.map(major => {
     const majorText = `${major.name} ${major.description}`;
@@ -63,7 +69,15 @@ async function scoreMajorsForCareer(
 
   scoredMajors.sort((a, b) => b.matchScore - a.matchScore);
 
-  return scoredMajors.filter(m => m.matchScore > 0).slice(0, 6);
+  console.log('\nTop 10 scored majors BEFORE filtering:');
+  scoredMajors.slice(0, 10).forEach((m, i) => {
+    console.log(`${i + 1}. ${m.major.name} - Score: ${m.matchScore}`);
+  });
+
+  const filteredMatches = scoredMajors.filter(m => m.matchScore > 0).slice(0, 6);
+  console.log(`\nFiltered to ${filteredMatches.length} majors with score > 0`);
+
+  return filteredMatches;
 }
 
 async function generateAIMatchReasons(
@@ -71,6 +85,8 @@ async function generateAIMatchReasons(
   careerDescription: string,
   matches: CareerMajorMatch[]
 ): Promise<CareerMajorMatch[]> {
+  console.log('\n=== GENERATING AI MATCH REASONS ===');
+  console.log('Number of matches to generate reasons for:', matches.length);
   if (matches.length === 0) return matches;
 
   try {
@@ -98,14 +114,18 @@ Format your response as a JSON array with this structure:
 
 Keep each reason under 100 characters if possible. Be specific and actionable.`;
 
+    console.log('Sending prompt to OpenAI...');
     const response = await sendMessage(
       [],
       prompt
     );
 
+    console.log('\nAI Response received (first 500 chars):', response.substring(0, 500));
+
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       console.warn('Could not parse AI response for match reasons');
+      console.warn('Full AI response:', response);
       return matches.map(m => ({
         ...m,
         matchReason: `This major provides relevant knowledge and skills for ${careerTitle}.`
@@ -113,19 +133,31 @@ Keep each reason under 100 characters if possible. Be specific and actionable.`;
     }
 
     const aiReasons = JSON.parse(jsonMatch[0]);
+    console.log('\nParsed AI reasons:', aiReasons);
 
     return matches.map(match => {
+      const firstWord = match.major.name.toLowerCase().split(' ')[0];
+      console.log(`\nMatching major "${match.major.name}" (first word: "${firstWord}")`);
+
       const aiReason = aiReasons.find(
-        (r: any) => r.majorName.toLowerCase().includes(match.major.name.toLowerCase().split(' ')[0])
+        (r: any) => {
+          const found = r.majorName.toLowerCase().includes(firstWord);
+          console.log(`  - Checking AI reason "${r.majorName}" - Match: ${found}`);
+          return found;
+        }
       );
+
+      const finalReason = aiReason?.reason || `Provides foundational skills for ${careerTitle}.`;
+      console.log(`  - Final reason: ${finalReason}`);
 
       return {
         ...match,
-        matchReason: aiReason?.reason || `Provides foundational skills for ${careerTitle}.`
+        matchReason: finalReason
       };
     });
   } catch (error) {
     console.error('Error generating AI match reasons:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return matches.map(m => ({
       ...m,
       matchReason: `This major provides relevant preparation for a career as a ${careerTitle}.`
@@ -139,21 +171,32 @@ export async function getMajorsForCareer(
   careerDescription: string,
   userProfile: UserProfile
 ): Promise<Major[]> {
+  console.log('\n\n========================================');
+  console.log('GET MAJORS FOR CAREER - START');
+  console.log('========================================');
+  console.log('Career Title:', careerTitle);
+  console.log('User Profile Interests:', userProfile.interests);
+  console.log('User Profile Strengths:', userProfile.strengths);
+
   try {
+    console.log('\nFetching majors from database...');
     const { data: allMajors, error } = await supabase
       .from('general_majors')
       .select('*')
       .limit(100);
 
     if (error) {
-      console.error('Error fetching majors:', error);
+      console.error('❌ Error fetching majors from database:', error);
       return [];
     }
 
     if (!allMajors || allMajors.length === 0) {
-      console.error('No majors found in database');
+      console.error('❌ No majors found in database');
       return [];
     }
+
+    console.log('✅ Fetched', allMajors.length, 'majors from database');
+    console.log('Sample major:', allMajors[0]);
 
     const mappedMajors: Major[] = allMajors.map((gm: any) => ({
       id: gm.cip_code,
@@ -174,7 +217,7 @@ export async function getMajorsForCareer(
     );
 
     if (scoredMatches.length === 0) {
-      console.log('No keyword matches found, returning top majors from user profile');
+      console.log('⚠️ No keyword matches found, returning top majors from database as fallback');
       return mappedMajors.slice(0, 4).map(m => ({
         ...m,
         matchReason: `Consider this major for a career in ${careerTitle}.`
@@ -187,13 +230,22 @@ export async function getMajorsForCareer(
       scoredMatches
     );
 
+    console.log('\n=== FINAL RESULTS ===');
+    console.log('Returning', matchesWithReasons.length, 'majors with reasons');
+    matchesWithReasons.forEach((m, i) => {
+      console.log(`${i + 1}. ${m.major.name} (Score: ${m.matchScore})`);
+      console.log(`   Reason: ${m.matchReason}`);
+    });
+    console.log('========================================\n\n');
+
     return matchesWithReasons.map(m => ({
       ...m.major,
       matchScore: m.matchScore,
       matchReason: m.matchReason
     }));
   } catch (error) {
-    console.error('Error in getMajorsForCareer:', error);
+    console.error('❌ Critical Error in getMajorsForCareer:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return [];
   }
 }

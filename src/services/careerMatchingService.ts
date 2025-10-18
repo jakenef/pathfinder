@@ -40,7 +40,8 @@ export async function findMatchingCareers(
     const { data: socRIData, error: riError } = await supabase.rpc('get_complete_soc_ri_data');
 
     // If RPC doesn't exist, fall back to filtering client-side
-    if (riError && riError.code === '42883') {
+    // PGRST202 = function not found in PostgREST, 42883 = function not found in Postgres
+    if (riError && (riError.code === 'PGRST202' || riError.code === '42883')) {
       console.log('RPC not found, using client-side filtering');
 
       // Get all basics codes first

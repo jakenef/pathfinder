@@ -35,10 +35,42 @@ export async function findMatchingCareers(
   userRIASECScore: RIASECScore
 ): Promise<SOCCareer[]> {
   try {
-    // Step 1: Get all SOC codes with their RIASEC scores from soc_ri table
-    const { data: socRIData, error: riError } = await supabase
-      .from('soc_ri')
-      .select('soc_code, realistic, investigative, artistic, social, enterprising, conventional');
+    // Step 1: Get SOC codes that exist in BOTH soc_ri AND soc_basics tables using RPC
+    // This avoids the issue where ~50% of soc_ri codes don't have basic data
+    const { data: socRIData, error: riError } = await supabase.rpc('get_complete_soc_ri_data');
+
+    // If RPC doesn't exist, fall back to filtering client-side
+    if (riError && riError.code === '42883') {
+      console.log('RPC not found, using client-side filtering');
+
+      // Get all basics codes first
+      const { data: basicsData } = await supabase
+        .from('soc_basics')
+        .select('soc_code');
+
+      const validCodes = new Set((basicsData || []).map(b => b.soc_code));
+
+      // Get all RI data
+      const { data: allRIData, error: allRIError } = await supabase
+        .from('soc_ri')
+        .select('soc_code, realistic, investigative, artistic, social, enterprising, conventional');
+
+      if (allRIError) {
+        console.error('Error fetching SOC RIASEC data:', allRIError);
+        return [];
+      }
+
+      // Filter to only codes that exist in basics
+      const filteredData = (allRIData || []).filter(ri => validCodes.has(ri.soc_code));
+      console.log(`Filtered to ${filteredData.length} SOC codes with complete data (from ${allRIData?.length || 0} total)`);
+
+      if (filteredData.length === 0) {
+        console.error('No SOC codes found with complete data');
+        return [];
+      }
+
+      return await processMatchingCareers(userRIASECScore, filteredData);
+    }
 
     if (riError) {
       console.error('Error fetching SOC RIASEC data:', riError);
@@ -50,7 +82,23 @@ export async function findMatchingCareers(
       return [];
     }
 
-    // Step 2: Calculate distances and find the best match
+    console.log(`Found ${socRIData.length} SOC codes with complete data`);
+
+    return await processMatchingCareers(userRIASECScore, socRIData);
+  } catch (error) {
+    console.error('Error in findMatchingCareers:', error);
+    return [];
+  }
+}
+
+async function processMatchingCareers(
+  userRIASECScore: RIASECScore,
+  socRIData: any[]
+): Promise<SOCCareer[]> {
+  try {
+
+
+    // Calculate distances and find the best match
     const scoredCareers = socRIData.map((career) => ({
       soc_code: career.soc_code,
       distance: calculateRIASECDistance(userRIASECScore, {
@@ -70,81 +118,16 @@ export async function findMatchingCareers(
     const bestMatch = scoredCareers[0];
     console.log('Best matching SOC code:', bestMatch.soc_code, 'Distance:', bestMatch.distance);
 
-    // Step 3: Get the title and description for the best match from soc_basics
+    // Get the title and description for the best match from soc_basics
+    // Since we pre-filtered, this should always exist
     const { data: bestMatchBasic, error: basicError } = await supabase
       .from('soc_basics')
       .select('soc_code, title, description')
       .eq('soc_code', bestMatch.soc_code)
       .maybeSingle();
 
-    if (basicError) {
-      console.error('Error fetching SOC basic data:', basicError);
-      console.error('SOC code searched:', bestMatch.soc_code);
-      return [];
-    }
-
-    if (!bestMatchBasic) {
-      console.error('No basic data found for SOC code:', bestMatch.soc_code);
-      console.log('This means the SOC code exists in soc_ri but not in soc_basics table');
-
-      // Skip to the next best match if the top one doesn't have basic data
-      // Try more matches since about half the SOC codes are missing from basics
-      for (let i = 1; i < Math.min(50, scoredCareers.length); i++) {
-        const altMatch = scoredCareers[i];
-        console.log(`Trying alternative match #${i}: ${altMatch.soc_code}`);
-
-        const { data: altBasic, error: altError } = await supabase
-          .from('soc_basics')
-          .select('soc_code, title, description')
-          .eq('soc_code', altMatch.soc_code)
-          .maybeSingle();
-
-        if (!altError && altBasic) {
-          console.log('Found alternative match with basic data:', altBasic.title);
-
-          // Use this alternative match
-          const { data: altRelatedData } = await supabase
-            .from('soc_related')
-            .select('related_soc_code, relatedness_tier')
-            .eq('soc_code', altMatch.soc_code)
-            .order('relatedness_tier', { ascending: true })
-            .limit(3);
-
-          const altRelatedSOCCodes = altRelatedData?.map((r) => r.related_soc_code) || [];
-
-          let altRelatedCareers: SOCCareer[] = [];
-          if (altRelatedSOCCodes.length > 0) {
-            const { data: altRelatedBasics, error: altRelatedBasicsError } = await supabase
-              .from('soc_basics')
-              .select('soc_code, title, description')
-              .in('soc_code', altRelatedSOCCodes);
-
-            if (!altRelatedBasicsError && altRelatedBasics) {
-              altRelatedCareers = altRelatedBasics.map((career) => ({
-                ...career,
-                isRelated: true,
-              }));
-            }
-          }
-
-          const results: SOCCareer[] = [
-            {
-              ...altBasic,
-              matchScore: 100 - Math.round(altMatch.distance),
-              isRelated: false,
-            },
-            ...altRelatedCareers,
-          ];
-
-          console.log('=== CAREER MATCHING RESULTS ===');
-          console.log('Top Match:', results[0].title);
-          console.log('Related Careers:', altRelatedCareers.map((c) => c.title).join(', '));
-
-          return results;
-        }
-      }
-
-      console.error('Could not find any valid SOC match with basic data');
+    if (basicError || !bestMatchBasic) {
+      console.error('Error fetching SOC basic data (should not happen with pre-filtered data):', basicError);
       return [];
     }
 

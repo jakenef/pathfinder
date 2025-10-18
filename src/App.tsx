@@ -82,6 +82,32 @@ function App() {
         currentSpeakingMessageId={currentSpeakingMessageId}
       />
 
+      {/* Debug info - remove this later */}
+      {session.phase === "major_suggestions" && (
+        <div className="px-6 pb-2">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-xs">
+              <strong>Debug Info:</strong> Phase: {session.phase}, 
+              Matched Careers: {session.matchedSOCCareers.length}, 
+              Suggested Majors: {session.suggestedMajors.length}
+              {session.matchedSOCCareers.length === 0 && session.suggestedMajors.length === 0 && (
+                <div className="mt-2 text-sm text-red-600">
+                  <strong>⚠️ Database appears to be empty!</strong>
+                  <br />
+                  Please run these commands to load data:
+                  <br />
+                  <code className="bg-gray-800 text-green-400 px-2 py-1 rounded mt-1 block">
+                    node load-soc-data.mjs
+                    <br />
+                    node load-cip-majors.mjs
+                  </code>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {session.phase === "major_suggestions" &&
         session.matchedSOCCareers.length > 0 && (
           <div className="px-6 pb-6">

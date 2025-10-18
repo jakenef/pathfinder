@@ -4,6 +4,7 @@ import { INTAKE_QUESTIONS } from "../types";
 import { speechRecognitionService } from "../services/speechService";
 import { textToSpeech, audioPlayer } from "../services/elevenLabsService";
 import { cleanTextForTTS } from "../lib/textCleaner";
+import { supabase } from "../lib/supabase";
 import {
   sendMessage,
   buildIntakeContext,
@@ -322,7 +323,11 @@ export function usePathfinderSession() {
       setAudioState((prev) => ({ ...prev, isPlaying: false }));
       setCurrentSpeakingMessageId(null);
 
-      const careers = await getCareersForMajor(major.id, major.name, major.description);
+      const careers = await getCareersForMajor(
+        major.id,
+        major.name,
+        major.description
+      );
       setSession((prev) => ({
         ...prev,
         suggestedCareers: careers,
@@ -388,69 +393,109 @@ export function usePathfinderSession() {
   }, []);
 
   const skipToDemo = useCallback(async () => {
-    setSession((prev) => ({
-      ...prev,
-      phase: "major_suggestions",
-    }));
+    try {
+      console.log("=== SKIP TO DEMO STARTED ===");
+      
+      // Show loading state
+      setSession((prev) => ({ ...prev, isProcessing: true }));
 
-    // Generate demo RIASEC score
-    const demoRIASECScore = generateDemoRIASECScore();
-    const topCodes = getTopRIASECCodes(demoRIASECScore);
-    const description = getRIASECDescription(demoRIASECScore);
+      // Generate demo RIASEC score (random)
+      const demoRIASECScore = generateDemoRIASECScore();
+      const topCodes = getTopRIASECCodes(demoRIASECScore);
+      const description = getRIASECDescription(demoRIASECScore);
 
-    console.log("=== DEMO RIASEC SCORE ===");
-    console.log("Realistic (hands-on):", demoRIASECScore.realistic);
-    console.log("Investigative (analytical):", demoRIASECScore.investigative);
-    console.log("Artistic (creative):", demoRIASECScore.artistic);
-    console.log("Social (helping):", demoRIASECScore.social);
-    console.log("Enterprising (leading):", demoRIASECScore.enterprising);
-    console.log("Conventional (organized):", demoRIASECScore.conventional);
-    console.log("Top RIASEC Code:", topCodes);
-    console.log("Description:", description);
-    console.log("========================");
+      console.log("=== DEMO RIASEC SCORE ===");
+      console.log("Realistic (hands-on):", demoRIASECScore.realistic);
+      console.log("Investigative (analytical):", demoRIASECScore.investigative);
+      console.log("Artistic (creative):", demoRIASECScore.artistic);
+      console.log("Social (helping):", demoRIASECScore.social);
+      console.log("Enterprising (leading):", demoRIASECScore.enterprising);
+      console.log("Conventional (organized):", demoRIASECScore.conventional);
+      console.log("Top RIASEC Code:", topCodes);
+      console.log("Description:", description);
+      console.log("========================");
 
-    // Create a demo profile
-    const demoProfile = {
-      interests: ["technology", "problem-solving", "creativity"],
-      strengths: ["analytical thinking", "communication"],
-      values: ["innovation", "impact"],
-      workStyle: ["collaborative", "flexible"],
-      responses: {},
-      riasecScore: demoRIASECScore,
-    };
+      // Create a demo profile with random RIASEC score
+      const demoProfile = {
+        interests: ["technology", "problem-solving", "creativity"],
+        strengths: ["analytical thinking", "communication"],
+        values: ["innovation", "impact"],
+        workStyle: ["collaborative", "flexible"],
+        responses: {},
+        riasecScore: demoRIASECScore,
+      };
 
-    // Find matching careers based on demo RIASEC score
-    const matchedCareers = await findMatchingCareers(demoRIASECScore);
+      console.log("Fetching careers and majors...");
 
-    // Get and score majors
-    const allMajors = await getMajors();
-    const scoredMajors = scoreMajors(allMajors, demoProfile);
+      // TEST: Check if database has data
+      const { data: testMajors, error: testMajorsError } = await supabase
+        .from('general_majors')
+        .select('cip_code')
+        .limit(1);
+      
+      const { data: testCareers, error: testCareersError } = await supabase
+        .from('soc_basics')
+        .select('soc_code')
+        .limit(1);
 
-    setSession((prev) => ({
-      ...prev,
-      userProfile: demoProfile,
-      matchedSOCCareers: matchedCareers,
-      suggestedMajors: scoredMajors,
-    }));
+      console.log("=== DATABASE TEST ===");
+      console.log("general_majors test:", testMajorsError ? `ERROR: ${testMajorsError.message}` : `OK (${testMajors?.length || 0} records)`);
+      console.log("soc_basics test:", testCareersError ? `ERROR: ${testCareersError.message}` : `OK (${testCareers?.length || 0} records)`);
+      console.log("====================");
 
-    // Add a welcome message
-    const welcomeMessage: Message = {
-      id: `${Date.now()}-${Math.random()}`,
-      role: "assistant",
-      content: "Welcome to the demo! I've generated a sample profile for you. Here are career and major matches based on that profile. Feel free to explore!",
-      timestamp: new Date(),
-    };
+      // Fetch matching careers and majors in parallel
+      const [matchedCareers, allMajors] = await Promise.all([
+        findMatchingCareers(demoRIASECScore),
+        getMajors(),
+      ]);
 
-    setSession((prev) => ({
-      ...prev,
-      messages: [welcomeMessage],
-      conversationHistory: [
-        { role: "assistant", content: welcomeMessage.content },
-      ],
-    }));
-  }, []);
+      console.log("=== DATA FETCH RESULTS ===");
+      console.log("Matched careers count:", matchedCareers.length);
+      console.log("Matched careers:", matchedCareers);
+      console.log("All majors count:", allMajors.length);
 
-  const setSelectedVoice = useCallback((voiceId: string) => {
+      // Score majors based on demo profile
+      const scoredMajors = scoreMajors(allMajors, demoProfile);
+
+      console.log("Scored majors count:", scoredMajors.length);
+      console.log("=========================");
+
+      // Add a welcome message with RIASEC info
+      const welcomeMessage: Message = {
+        id: `${Date.now()}-${Math.random()}`,
+        role: "assistant",
+        content: `Welcome to the demo! I've generated a sample profile for you with the RIASEC code ${topCodes}. ${description}\n\nBelow, you'll find career matches based on this profile. Click any career to see which majors will help you get there!`,
+        timestamp: new Date(),
+      };
+
+      console.log("Setting session state with:", {
+        phase: "major_suggestions",
+        matchedSOCCareers: matchedCareers.length,
+        suggestedMajors: scoredMajors.length,
+      });
+
+      // Update session with all data at once
+      setSession((prev) => ({
+        ...prev,
+        phase: "major_suggestions",
+        userProfile: demoProfile,
+        matchedSOCCareers: matchedCareers,
+        suggestedMajors: scoredMajors,
+        messages: [welcomeMessage],
+        conversationHistory: [
+          { role: "assistant", content: welcomeMessage.content },
+        ],
+        isProcessing: false,
+      }));
+
+      console.log("=== SKIP TO DEMO COMPLETE ===");
+    } catch (error) {
+      console.error("Error in skipToDemo:", error);
+      setError("Failed to load demo. Please try again.");
+      setSession((prev) => ({ ...prev, isProcessing: false }));
+      setTimeout(() => setError(null), 3000);
+    }
+  }, []);  const setSelectedVoice = useCallback((voiceId: string) => {
     setSession((prev) => ({ ...prev, selectedVoiceId: voiceId }));
   }, []);
 
@@ -546,17 +591,22 @@ export function usePathfinderSession() {
           isProcessing: false,
         }));
       } catch (error) {
-        console.error('Error fetching career-specific majors:', error);
+        console.error("Error fetching career-specific majors:", error);
         setSession((prev) => ({
           ...prev,
           isProcessing: false,
           expandedCareerCode: null,
         }));
-        setError('Failed to load majors for this career. Please try again.');
+        setError("Failed to load majors for this career. Please try again.");
         setTimeout(() => setError(null), 3000);
       }
     },
-    [session.expandedCareerCode, session.careerSpecificMajors, session.userProfile, session.isProcessing]
+    [
+      session.expandedCareerCode,
+      session.careerSpecificMajors,
+      session.userProfile,
+      session.isProcessing,
+    ]
   );
 
   useEffect(() => {

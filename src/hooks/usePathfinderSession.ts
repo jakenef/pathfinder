@@ -17,6 +17,7 @@ import {
   calculateRIASECScore,
   getTopRIASECCodes,
   getRIASECDescription,
+  generateDemoRIASECScore,
 } from "../services/riasecService";
 import { findMatchingCareers } from "../services/careerMatchingService";
 
@@ -374,6 +375,69 @@ export function usePathfinderSession() {
     setCurrentSpeakingMessageId(null);
   }, []);
 
+  const skipToDemo = useCallback(async () => {
+    setSession((prev) => ({
+      ...prev,
+      phase: "major_suggestions",
+    }));
+
+    // Generate demo RIASEC score
+    const demoRIASECScore = generateDemoRIASECScore();
+    const topCodes = getTopRIASECCodes(demoRIASECScore);
+    const description = getRIASECDescription(demoRIASECScore);
+
+    console.log("=== DEMO RIASEC SCORE ===");
+    console.log("Realistic (hands-on):", demoRIASECScore.realistic);
+    console.log("Investigative (analytical):", demoRIASECScore.investigative);
+    console.log("Artistic (creative):", demoRIASECScore.artistic);
+    console.log("Social (helping):", demoRIASECScore.social);
+    console.log("Enterprising (leading):", demoRIASECScore.enterprising);
+    console.log("Conventional (organized):", demoRIASECScore.conventional);
+    console.log("Top RIASEC Code:", topCodes);
+    console.log("Description:", description);
+    console.log("========================");
+
+    // Create a demo profile
+    const demoProfile = {
+      interests: ["technology", "problem-solving", "creativity"],
+      strengths: ["analytical thinking", "communication"],
+      values: ["innovation", "impact"],
+      workStyle: ["collaborative", "flexible"],
+      responses: {},
+      riasecScore: demoRIASECScore,
+    };
+
+    // Find matching careers based on demo RIASEC score
+    const matchedCareers = await findMatchingCareers(demoRIASECScore);
+
+    // Get and score majors
+    const allMajors = await getMajors();
+    const scoredMajors = scoreMajors(allMajors, demoProfile);
+
+    setSession((prev) => ({
+      ...prev,
+      userProfile: demoProfile,
+      matchedSOCCareers: matchedCareers,
+      suggestedMajors: scoredMajors,
+    }));
+
+    // Add a welcome message
+    const welcomeMessage: Message = {
+      id: `${Date.now()}-${Math.random()}`,
+      role: "assistant",
+      content: "Welcome to the demo! I've generated a sample profile for you. Here are career and major matches based on that profile. Feel free to explore!",
+      timestamp: new Date(),
+    };
+
+    setSession((prev) => ({
+      ...prev,
+      messages: [welcomeMessage],
+      conversationHistory: [
+        { role: "assistant", content: welcomeMessage.content },
+      ],
+    }));
+  }, []);
+
   const setSelectedVoice = useCallback((voiceId: string) => {
     setSession((prev) => ({ ...prev, selectedVoiceId: voiceId }));
   }, []);
@@ -441,6 +505,7 @@ export function usePathfinderSession() {
     error,
     currentSpeakingMessageId,
     startSession,
+    skipToDemo,
     handleUserMessage,
     selectMajor,
     goToSummary,

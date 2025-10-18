@@ -250,3 +250,28 @@ export function getRIASECDescription(score: RIASECScore): string {
   const topDimensions = topCode.split("").map((code) => descriptions[code]);
   return `Your top interests are: ${topDimensions.join(", ")}`;
 }
+
+/**
+ * Generate random RIASEC scores for demo purposes
+ * Scores are on 0-7 scale to match SOC database
+ */
+export function generateDemoRIASECScore(): RIASECScore {
+  // Create a few predefined interesting profiles
+  const profiles: RIASECScore[] = [
+    // Creative Investigator (Artist/Scientist)
+    { realistic: 2.5, investigative: 6.8, artistic: 6.5, social: 4.2, enterprising: 3.1, conventional: 2.8 },
+    // Social Leader (Teacher/Manager)
+    { realistic: 1.8, investigative: 4.5, artistic: 3.9, social: 6.9, enterprising: 6.2, conventional: 4.1 },
+    // Tech Builder (Engineer)
+    { realistic: 6.7, investigative: 6.4, artistic: 2.9, social: 3.2, enterprising: 4.5, conventional: 5.1 },
+    // Creative Entrepreneur
+    { realistic: 3.1, investigative: 4.2, artistic: 6.8, social: 5.3, enterprising: 6.5, conventional: 3.7 },
+    // Healthcare Professional
+    { realistic: 4.3, investigative: 5.9, artistic: 2.8, social: 6.7, enterprising: 3.9, conventional: 4.8 },
+  ];
+
+  // Pick a random profile
+  const randomProfile = profiles[Math.floor(Math.random() * profiles.length)];
+
+  return randomProfile;
+}

@@ -1,14 +1,16 @@
-import { Compass, Sparkles, MessageCircle, Target } from "lucide-react";
+import { Compass, Sparkles, MessageCircle, Target, FastForward } from "lucide-react";
 import { VoicePicker } from "./VoicePicker";
 
 interface WelcomeScreenProps {
   onStart: () => void;
+  onSkipToDemo: () => void;
   onSelectVoice?: (voiceId: string) => void;
   selectedVoiceId?: string | null;
 }
 
 export function WelcomeScreen({
   onStart,
+  onSkipToDemo,
   onSelectVoice,
   selectedVoiceId,
 }: WelcomeScreenProps) {
@@ -94,7 +96,7 @@ export function WelcomeScreen({
           />
         </div>
 
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <button
             onClick={onStart}
             disabled={!selectedVoiceId}
@@ -103,9 +105,22 @@ export function WelcomeScreen({
             <Sparkles className="w-5 h-5" />
             Start Your Journey
           </button>
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="text-sm text-gray-500">
             This will take about 5-10 minutes
           </p>
+
+          <div className="pt-4 border-t border-gray-200">
+            <button
+              onClick={onSkipToDemo}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white text-sm font-semibold rounded-lg hover:from-gray-700 hover:to-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+            >
+              <FastForward className="w-4 h-4" />
+              Quick Demo (Skip to Results)
+            </button>
+            <p className="mt-2 text-xs text-gray-500">
+              Skip questions and see results with sample data
+            </p>
+          </div>
         </div>
       </div>
     </div>

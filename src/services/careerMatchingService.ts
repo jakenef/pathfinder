@@ -102,7 +102,7 @@ export async function findMatchingCareers(
           console.log('Found alternative match with basic data:', altBasic.title);
 
           // Use this alternative match
-          const { data: altRelatedData, error: altRelatedError } = await supabase
+          const { data: altRelatedData } = await supabase
             .from('soc_related')
             .select('related_soc_code, relatedness_tier')
             .eq('soc_code', altMatch.soc_code)

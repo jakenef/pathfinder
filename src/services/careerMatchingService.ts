@@ -158,10 +158,41 @@ async function processMatchingCareers(
       if (relatedBasicsError) {
         console.error('Error fetching related career basics:', relatedBasicsError);
       } else if (relatedBasics) {
+        console.log(`Found ${relatedBasics.length} of ${relatedSOCCodes.length} related careers in soc_basics`);
         relatedCareers = relatedBasics.map((career) => ({
           ...career,
           isRelated: true,
         }));
+      }
+
+      // If we didn't find enough related careers, supplement with next best RIASEC matches
+      if (relatedCareers.length < 3) {
+        console.log(`Only found ${relatedCareers.length} related careers, supplementing with RIASEC matches`);
+        const existingCodes = new Set([bestMatch.soc_code, ...relatedCareers.map(c => c.soc_code)]);
+
+        // Get next best matches that aren't already included
+        const supplementalMatches = scoredCareers
+          .filter(sc => !existingCodes.has(sc.soc_code))
+          .slice(0, 3 - relatedCareers.length);
+
+        const supplementalCodes = supplementalMatches.map(m => m.soc_code);
+
+        if (supplementalCodes.length > 0) {
+          const { data: supplementalBasics } = await supabase
+            .from('soc_basics')
+            .select('soc_code, title, description')
+            .in('soc_code', supplementalCodes);
+
+          if (supplementalBasics) {
+            relatedCareers = [
+              ...relatedCareers,
+              ...supplementalBasics.map(career => ({
+                ...career,
+                isRelated: true,
+              }))
+            ];
+          }
+        }
       }
     }
 

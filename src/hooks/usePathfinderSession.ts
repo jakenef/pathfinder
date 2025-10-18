@@ -308,11 +308,16 @@ export function usePathfinderSession() {
 
   const selectMajor = useCallback(
     async (major: Major) => {
+      // Stop any ongoing audio playback
+      audioPlayer.stop();
       setSession((prev) => ({
         ...prev,
         selectedMajor: major,
         phase: "career_suggestions",
+        isAISpeaking: false,
       }));
+      setAudioState((prev) => ({ ...prev, isPlaying: false }));
+      setCurrentSpeakingMessageId(null);
 
       const careers = await getCareersForMajor(major.id, major.name, major.description);
       setSession((prev) => ({
@@ -350,7 +355,11 @@ export function usePathfinderSession() {
   );
 
   const goToSummary = useCallback(async () => {
-    setSession((prev) => ({ ...prev, phase: "summary" }));
+    // Stop any ongoing audio playback
+    audioPlayer.stop();
+    setSession((prev) => ({ ...prev, phase: "summary", isAISpeaking: false }));
+    setAudioState((prev) => ({ ...prev, isPlaying: false }));
+    setCurrentSpeakingMessageId(null);
 
     if (session.selectedMajor) {
       await processAIResponse(() =>

@@ -158,7 +158,7 @@ function App() {
               <div className="text-center mt-6">
                 <button
                   onClick={goToSummary}
-                  disabled={session.isProcessing || session.isAISpeaking}
+                  disabled={session.isProcessing}
                   className="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white text-lg font-semibold rounded-xl hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:hover:scale-100"
                 >
                   View Your Complete Roadmap

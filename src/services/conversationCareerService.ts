@@ -14,6 +14,61 @@ interface CareerComparisonResult {
   source: 'conversation' | 'riasec' | 'both';
 }
 
+interface ExtractedKeywords {
+  domains: string[];
+  interests: string[];
+  activities: string[];
+}
+
+function extractInterestKeywords(conversationHistory: Array<{ role: string; content: string }>): ExtractedKeywords {
+  const conversationText = conversationHistory
+    .filter(msg => msg.role === 'user')
+    .map(msg => msg.content.toLowerCase())
+    .join(' ');
+
+  const domainKeywords: { [key: string]: string[] } = {
+    'Marine Biology / Aquatic Sciences': ['fish', 'aquarium', 'marine', 'ocean', 'sea', 'aquatic', 'underwater', 'coral', 'reef', 'whale', 'dolphin', 'shark'],
+    'Veterinary / Animal Care': ['animals', 'pets', 'vet', 'veterinary', 'dog', 'cat', 'wildlife', 'zoo', 'animal care'],
+    'Healthcare / Medicine': ['doctor', 'nurse', 'medicine', 'hospital', 'patient', 'health', 'medical', 'surgery', 'clinic'],
+    'Technology / Computer Science': ['coding', 'programming', 'software', 'computer', 'app', 'website', 'tech', 'data', 'ai', 'machine learning'],
+    'Education / Teaching': ['teaching', 'teacher', 'education', 'school', 'students', 'learning', 'curriculum', 'classroom'],
+    'Arts / Creative': ['art', 'design', 'creative', 'drawing', 'painting', 'music', 'film', 'photography', 'graphic'],
+    'Business / Entrepreneurship': ['business', 'startup', 'entrepreneur', 'company', 'sales', 'marketing', 'management'],
+    'Environmental Science': ['environment', 'sustainability', 'conservation', 'ecology', 'climate', 'nature', 'forest', 'wildlife'],
+    'Psychology / Counseling': ['psychology', 'counseling', 'therapy', 'mental health', 'behavior', 'helping people'],
+    'Engineering': ['engineering', 'build', 'design', 'mechanical', 'electrical', 'civil', 'construction'],
+    'Agriculture / Horticulture': ['farming', 'agriculture', 'plants', 'gardening', 'crops', 'horticulture']
+  };
+
+  const detectedDomains: string[] = [];
+  const detectedInterests: string[] = [];
+
+  for (const [domain, keywords] of Object.entries(domainKeywords)) {
+    for (const keyword of keywords) {
+      if (conversationText.includes(keyword)) {
+        if (!detectedDomains.includes(domain)) {
+          detectedDomains.push(domain);
+        }
+        detectedInterests.push(keyword);
+      }
+    }
+  }
+
+  const activities = conversationText.match(/\b(work with|working with|study|studying|learn about|interested in|love|enjoy|passionate about)\s+([\w\s]+)/g) || [];
+
+  console.log('\n=== KEYWORD EXTRACTION ===');
+  console.log('Detected domains:', detectedDomains);
+  console.log('Interest keywords:', [...new Set(detectedInterests)]);
+  console.log('Activity phrases:', activities.slice(0, 5));
+  console.log('========================');
+
+  return {
+    domains: detectedDomains,
+    interests: [...new Set(detectedInterests)],
+    activities: activities.slice(0, 10)
+  };
+}
+
 export async function extractCareersFromConversation(
   conversationHistory: Array<{ role: string; content: string }>
 ): Promise<ConversationCareer[]> {
@@ -29,45 +84,127 @@ export async function extractCareersFromConversation(
       .map(msg => `${msg.role}: ${msg.content}`)
       .join('\n');
 
-    const prompt = `Analyze this conversation between a career counselor and student. Identify any specific careers the student has expressed interest in or mentioned.
+    const keywords = extractInterestKeywords(conversationHistory);
+    const keywordContext = keywords.domains.length > 0
+      ? `\n\nDetected interest domains from keywords: ${keywords.domains.join(', ')}\nKey interest terms: ${keywords.interests.slice(0, 10).join(', ')}`
+      : '';
+
+    const prompt = `Analyze this conversation between a career counselor and student. Identify careers the student would be interested in based on:
+1. Careers they explicitly mentioned by name
+2. Careers strongly implied by their interests, passions, and activities
 
 Conversation:
-${conversationText}
+${conversationText}${keywordContext}
 
-If the student mentioned or expressed interest in specific careers, list them. Otherwise, return an empty array.
-
-Return a JSON array:
+Return a JSON array of relevant careers:
 [
   {
-    "careerTitle": "Specific career title mentioned",
-    "confidence": 0.0-1.0 (how confident you are this is a serious interest),
-    "reason": "Brief explanation of why you identified this career"
+    "careerTitle": "Specific career title (use official job titles)",
+    "confidence": 0.0-1.0,
+    "reason": "Brief explanation"
   }
 ]
 
-IMPORTANT:
-- Only include careers the student specifically mentioned or clearly expressed interest in
-- Do NOT infer careers just from general interests
-- If no specific careers were mentioned, return []
-- Use proper career titles (e.g., "Software Engineer" not "coding job")`;
+EXAMPLES of good inference:
+- Student says "I love fish, want to work with fish, work in an aquarium" → Suggest "Marine Biologist" (0.9), "Aquarist" (0.85), "Aquarium Curator" (0.75)
+- Student says "I enjoy coding and building apps" → Suggest "Software Developer" (0.85), "Mobile App Developer" (0.8)
+- Student says "I want to help people with mental health" → Suggest "Clinical Psychologist" (0.85), "Counselor" (0.8)
+
+GUIDELINES:
+- HIGH confidence (0.8-1.0): Student explicitly mentioned the career OR showed very strong, specific interest
+- MEDIUM confidence (0.6-0.79): Student described activities/interests that strongly align with the career
+- LOW confidence (0.4-0.59): Student mentioned related interests but not as specifically
+- Use official career titles from O*NET or Bureau of Labor Statistics
+- If student shows passion for a topic ("I love X", "I'm passionate about Y"), infer related careers
+- Better to suggest 2-4 relevant careers than return empty array when interests are clear
+- Only return [] if the conversation is truly too vague or general
+
+IMPORTANT: When someone describes wanting to work with specific things (animals, fish, computers, people, etc.), suggest careers in that field!`;
 
     console.log('Sending conversation to OpenAI for career extraction...');
     const response = await sendMessage([], prompt);
 
-    console.log('OpenAI response:', response.substring(0, 500));
+    console.log('OpenAI response:', response);
 
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.log('No JSON found in response, no careers mentioned');
-      return [];
+      console.log('⚠️ No JSON found in OpenAI response');
+      console.log('Attempting fallback career extraction...');
+      return await fallbackCareerExtraction(keywords);
     }
 
     const careers: ConversationCareer[] = JSON.parse(jsonMatch[0]);
-    console.log(`✅ Found ${careers.length} career(s) mentioned:`, careers);
+    console.log(`✅ Found ${careers.length} career(s) from OpenAI:`, careers);
 
-    return careers.filter(c => c.confidence >= 0.5);
+    if (careers.length === 0 && keywords.domains.length > 0) {
+      console.log('OpenAI returned 0 careers but keywords detected, using fallback...');
+      return await fallbackCareerExtraction(keywords);
+    }
+
+    return careers.filter(c => c.confidence >= 0.4);
   } catch (error) {
     console.error('Error extracting careers from conversation:', error);
+    const keywords = extractInterestKeywords(conversationHistory);
+    if (keywords.domains.length > 0) {
+      console.log('Error occurred but keywords detected, trying fallback...');
+      return await fallbackCareerExtraction(keywords);
+    }
+    return [];
+  }
+}
+
+async function fallbackCareerExtraction(keywords: ExtractedKeywords): Promise<ConversationCareer[]> {
+  console.log('\n=== FALLBACK CAREER EXTRACTION ===');
+
+  if (keywords.domains.length === 0) {
+    console.log('No domains detected, cannot perform fallback');
+    return [];
+  }
+
+  try {
+    const { data: allSOCs, error } = await supabase
+      .from('soc_basics')
+      .select('soc_code, title, description');
+
+    if (error || !allSOCs) {
+      console.error('Error fetching SOC data:', error);
+      return [];
+    }
+
+    const matchedCareers: ConversationCareer[] = [];
+    const interestTerms = keywords.interests.slice(0, 5);
+
+    console.log(`Searching SOC database for careers matching: ${interestTerms.join(', ')}`);
+
+    for (const soc of allSOCs) {
+      const searchText = `${soc.title} ${soc.description}`.toLowerCase();
+      let matchScore = 0;
+      const matchedTerms: string[] = [];
+
+      for (const term of interestTerms) {
+        if (searchText.includes(term)) {
+          matchScore++;
+          matchedTerms.push(term);
+        }
+      }
+
+      if (matchScore >= 2 || (matchScore >= 1 && interestTerms.length <= 2)) {
+        const confidence = Math.min(0.5 + (matchScore * 0.15), 0.85);
+        matchedCareers.push({
+          careerTitle: soc.title,
+          confidence,
+          reason: `Matches your interest in: ${matchedTerms.join(', ')}`
+        });
+      }
+    }
+
+    matchedCareers.sort((a, b) => b.confidence - a.confidence);
+    const topCareers = matchedCareers.slice(0, 4);
+
+    console.log(`✅ Fallback found ${topCareers.length} careers:`, topCareers);
+    return topCareers;
+  } catch (error) {
+    console.error('Error in fallback career extraction:', error);
     return [];
   }
 }
@@ -106,11 +243,23 @@ async function findSOCCodeForCareer(careerTitle: string): Promise<SOCCareer | nu
       return partialMatch;
     }
 
+    console.log('Searching in SOC descriptions for keyword matches...');
+    const keywordMatches = allSOCs.filter(soc => {
+      const searchText = `${soc.title} ${soc.description}`.toLowerCase();
+      const careerWords = lowerCareerTitle.split(' ').filter(w => w.length > 3);
+      return careerWords.some(word => searchText.includes(word));
+    });
+
+    if (keywordMatches.length > 0) {
+      console.log(`✅ Found ${keywordMatches.length} description matches, using top result: ${keywordMatches[0].title}`);
+      return keywordMatches[0];
+    }
+
     const prompt = `Given this career title: "${careerTitle}"
 
 From this list of SOC (Standard Occupational Classification) careers, which ONE is the best match?
 
-${allSOCs.slice(0, 200).map(s => `- ${s.title} [${s.soc_code}]`).join('\n')}
+${allSOCs.slice(0, 300).map(s => `- ${s.title} [${s.soc_code}]`).join('\n')}
 
 Return ONLY a JSON object:
 {
@@ -119,7 +268,9 @@ Return ONLY a JSON object:
   "matchReason": "Brief explanation"
 }
 
-If no good match exists, return: {"socCode": null}`;
+If no good match exists, return: {"socCode": null}
+
+NOTE: Consider both exact title matches and careers that would involve similar work/skills.`;
 
     console.log('Using AI to find best SOC match...');
     const response = await sendMessage([], prompt);
@@ -215,9 +366,14 @@ async function compareConversationAndRIASECCareers(
       .map(c => `- ${c.title}${c.isRelated ? ' (related)' : ' (top match)'}`)
       .join('\n');
 
+    const avgConfidence = conversationCareers.reduce((sum, c) => sum + c.confidence, 0) / conversationCareers.length;
+    const hasHighConfidence = conversationCareers.some(c => c.confidence >= 0.7);
+
+    console.log(`Conversation careers avg confidence: ${avgConfidence.toFixed(2)}, has high confidence: ${hasHighConfidence}`);
+
     const prompt = `You are a career counselor. Compare two sources of career recommendations for a student:
 
-STUDENT'S MENTIONED CAREERS (from conversation):
+STUDENT'S INTEREST-BASED CAREERS (from conversation):
 ${conversationList}
 
 RIASEC ASSESSMENT CAREERS (from personality test):
@@ -231,6 +387,8 @@ RIASEC Score (0-10 scale):
 - Enterprising (leading): ${riasecScore.enterprising}
 - Conventional (organized): ${riasecScore.conventional}
 
+Average conversation confidence: ${avgConfidence.toFixed(2)}
+
 Determine which careers to show the student. Return a JSON object:
 {
   "recommendation": "conversation" | "riasec" | "both",
@@ -238,10 +396,12 @@ Determine which careers to show the student. Return a JSON object:
 }
 
 Guidelines:
-- If conversation careers align well with RIASEC scores, return "both"
-- If conversation careers conflict with RIASEC scores but student showed strong interest, return "conversation"
-- If conversation careers are vague or RIASEC is clearly better, return "riasec"
-- Consider student's confidence and specificity when they mentioned careers`;
+- If conversation careers are interest-based (confidence 0.6+) and align reasonably with RIASEC, prefer "both"
+- If student showed STRONG passion (confidence 0.75+), heavily favor "conversation" or "both"
+- Interest-based careers from conversation should be weighted MORE than RIASEC when confidence is high
+- Only use "riasec" alone if conversation careers are very low confidence (<0.5) or completely misaligned
+- Default to "both" when in doubt - combining interests and personality is best
+- Consider that students expressing specific interests (like "I love fish") deserve to see those careers`;
 
     console.log('Asking AI to compare career sources...');
     const response = await sendMessage([], prompt);
@@ -274,6 +434,13 @@ export async function enrichCareersWithConversation(
 
   const conversationCareers = await extractCareersFromConversation(conversationHistory);
 
+  console.log(`\n📊 Extracted ${conversationCareers.length} careers from conversation`);
+  if (conversationCareers.length > 0) {
+    conversationCareers.forEach(c => {
+      console.log(`  - ${c.careerTitle} (confidence: ${c.confidence.toFixed(2)}, reason: ${c.reason})`);
+    });
+  }
+
   if (conversationCareers.length === 0) {
     console.log('\n✅ No careers mentioned in conversation, using RIASEC results');
     return {
@@ -284,9 +451,11 @@ export async function enrichCareersWithConversation(
 
   const conversationSOCCareers: SOCCareer[] = [];
 
+  console.log('\n🔍 Matching conversation careers to SOC codes...');
   for (const career of conversationCareers) {
     const socCareer = await findSOCCodeForCareer(career.careerTitle);
     if (socCareer) {
+      console.log(`  ✅ Matched "${career.careerTitle}" to SOC: ${socCareer.title} (${socCareer.soc_code})`);
       conversationSOCCareers.push({
         ...socCareer,
         matchScore: Math.round(career.confidence * 100),
@@ -295,8 +464,12 @@ export async function enrichCareersWithConversation(
 
       const related = await getRelatedCareersForSOC(socCareer.soc_code);
       conversationSOCCareers.push(...related.slice(0, 2));
+    } else {
+      console.log(`  ❌ Could not find SOC match for "${career.careerTitle}"`);
     }
   }
+
+  console.log(`\n📋 Total conversation-based SOC careers: ${conversationSOCCareers.length}`);
 
   if (conversationSOCCareers.length === 0) {
     console.log('\n⚠️ Could not match conversation careers to SOC codes, using RIASEC');

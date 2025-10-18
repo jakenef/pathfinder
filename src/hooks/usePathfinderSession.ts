@@ -212,7 +212,9 @@ export function usePathfinderSession() {
             setFinalTranscript(transcriptRef.current.trim());
             setInterimTranscript('');
           } else {
-            setInterimTranscript(transcript);
+            // Show accumulated text + current interim text
+            const fullDisplay = transcriptRef.current + transcript;
+            setInterimTranscript(fullDisplay);
           }
         },
         (error) => {

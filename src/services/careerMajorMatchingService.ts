@@ -165,6 +165,92 @@ Keep each reason under 100 characters if possible. Be specific and actionable.`;
   }
 }
 
+async function selectMajorsWithAI(
+  careerTitle: string,
+  careerDescription: string,
+  allMajors: Major[]
+): Promise<CareerMajorMatch[]> {
+  console.log('\n=== AI-BASED MAJOR SELECTION ===');
+
+  try {
+    const majorsList = allMajors.map((m, i) =>
+      `${i + 1}. [${m.id}] ${m.name}: ${m.description.substring(0, 100)}...`
+    ).join('\n');
+
+    const prompt = `You are a career counselor helping a student who wants to become a "${careerTitle}".
+
+Career Description: ${careerDescription.substring(0, 400)}
+
+Below is a complete list of available college majors. Select the 4-6 most relevant majors that would directly prepare someone for this career. Focus on majors that provide the necessary knowledge, skills, and credentials.
+
+Available Majors:
+${majorsList}
+
+For each selected major, provide:
+1. The exact major name as it appears in the list
+2. A brief (1-2 sentences) explanation of why this major prepares someone for this career
+
+Format your response as a JSON array:
+[
+  {
+    "majorName": "Exact major name from list",
+    "cipCode": "The CIP code in brackets",
+    "reason": "Brief explanation (under 120 characters)"
+  }
+]
+
+IMPORTANT:
+- Use the EXACT major names from the list above
+- Choose majors that DIRECTLY relate to the career
+- Prioritize practical relevance over superficial keyword matches
+- Return 4-6 majors maximum`;
+
+    console.log('Sending major selection prompt to OpenAI...');
+    const response = await sendMessage([], prompt);
+
+    console.log('\nAI Response received (first 800 chars):', response.substring(0, 800));
+
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('❌ Could not parse AI response');
+      console.warn('Full response:', response);
+      return [];
+    }
+
+    const aiSelections = JSON.parse(jsonMatch[0]);
+    console.log('\n✅ Parsed AI selections:', aiSelections);
+
+    const matches: CareerMajorMatch[] = [];
+
+    for (const selection of aiSelections) {
+      const major = allMajors.find(m =>
+        m.id === selection.cipCode ||
+        m.name.toLowerCase() === selection.majorName.toLowerCase() ||
+        m.name.toLowerCase().includes(selection.majorName.toLowerCase().substring(0, 20))
+      );
+
+      if (major) {
+        console.log(`✅ Matched: "${selection.majorName}" -> ${major.name}`);
+        matches.push({
+          major,
+          matchScore: 10,
+          matchReason: selection.reason
+        });
+      } else {
+        console.log(`❌ Could not find major: "${selection.majorName}" (CIP: ${selection.cipCode})`);
+      }
+    }
+
+    console.log(`\n✅ Successfully matched ${matches.length} majors`);
+    return matches;
+
+  } catch (error) {
+    console.error('❌ Error in AI major selection:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    return [];
+  }
+}
+
 export async function getMajorsForCareer(
   _socCode: string,
   careerTitle: string,
@@ -182,8 +268,7 @@ export async function getMajorsForCareer(
     console.log('\nFetching majors from database...');
     const { data: allMajors, error } = await supabase
       .from('general_majors')
-      .select('*')
-      .limit(100);
+      .select('*');
 
     if (error) {
       console.error('❌ Error fetching majors from database:', error);
@@ -196,7 +281,6 @@ export async function getMajorsForCareer(
     }
 
     console.log('✅ Fetched', allMajors.length, 'majors from database');
-    console.log('Sample major:', allMajors[0]);
 
     const mappedMajors: Major[] = allMajors.map((gm: any) => ({
       id: gm.cip_code,
@@ -209,36 +293,47 @@ export async function getMajorsForCareer(
       created_at: new Date().toISOString(),
     }));
 
-    const scoredMatches = await scoreMajorsForCareer(
+    const aiMatches = await selectMajorsWithAI(
       careerTitle,
       careerDescription,
-      mappedMajors,
-      userProfile
+      mappedMajors
     );
 
-    if (scoredMatches.length === 0) {
-      console.log('⚠️ No keyword matches found, returning top majors from database as fallback');
-      return mappedMajors.slice(0, 4).map(m => ({
-        ...m,
-        matchReason: `Consider this major for a career in ${careerTitle}.`
+    if (aiMatches.length === 0) {
+      console.log('⚠️ AI selection failed, falling back to keyword matching');
+      const scoredMatches = await scoreMajorsForCareer(
+        careerTitle,
+        careerDescription,
+        mappedMajors,
+        userProfile
+      );
+
+      if (scoredMatches.length === 0) {
+        return [];
+      }
+
+      const matchesWithReasons = await generateAIMatchReasons(
+        careerTitle,
+        careerDescription,
+        scoredMatches
+      );
+
+      return matchesWithReasons.map(m => ({
+        ...m.major,
+        matchScore: m.matchScore,
+        matchReason: m.matchReason
       }));
     }
 
-    const matchesWithReasons = await generateAIMatchReasons(
-      careerTitle,
-      careerDescription,
-      scoredMatches
-    );
-
     console.log('\n=== FINAL RESULTS ===');
-    console.log('Returning', matchesWithReasons.length, 'majors with reasons');
-    matchesWithReasons.forEach((m, i) => {
-      console.log(`${i + 1}. ${m.major.name} (Score: ${m.matchScore})`);
+    console.log('Returning', aiMatches.length, 'AI-selected majors');
+    aiMatches.forEach((m, i) => {
+      console.log(`${i + 1}. ${m.major.name}`);
       console.log(`   Reason: ${m.matchReason}`);
     });
     console.log('========================================\n\n');
 
-    return matchesWithReasons.map(m => ({
+    return aiMatches.map(m => ({
       ...m.major,
       matchScore: m.matchScore,
       matchReason: m.matchReason

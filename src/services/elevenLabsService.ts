@@ -69,6 +69,7 @@ export class AudioPlayer {
     const buffer = await this.audioContext.decodeAudioData(audioBuffer.slice(0));
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = 1;
     source.connect(this.audioContext.destination);
 
     return new Promise<void>((resolve) => {

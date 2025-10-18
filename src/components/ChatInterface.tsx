@@ -6,9 +6,11 @@ import { Loader2 } from 'lucide-react';
 interface ChatInterfaceProps {
   messages: Message[];
   isProcessing: boolean;
+  currentSpeakingMessageId?: string | null;
+  onSkipAudio?: () => void;
 }
 
-export function ChatInterface({ messages, isProcessing }: ChatInterfaceProps) {
+export function ChatInterface({ messages, isProcessing, currentSpeakingMessageId, onSkipAudio }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -27,7 +29,12 @@ export function ChatInterface({ messages, isProcessing }: ChatInterfaceProps) {
     >
       <div className="max-w-4xl mx-auto space-y-6">
         {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+          <ChatMessage
+            key={message.id}
+            message={message}
+            isAudioPlaying={currentSpeakingMessageId === message.id}
+            onSkipAudio={onSkipAudio}
+          />
         ))}
 
         {isProcessing && (

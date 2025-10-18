@@ -1,11 +1,13 @@
 import type { Message } from '../types';
-import { User, Sparkles } from 'lucide-react';
+import { User, Sparkles, SkipForward } from 'lucide-react';
 
 interface ChatMessageProps {
   message: Message;
+  isAudioPlaying?: boolean;
+  onSkipAudio?: () => void;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, isAudioPlaying, onSkipAudio }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
   return (
@@ -36,8 +38,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
         >
           <p className="text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
         </div>
-        <div className={`mt-1 text-xs text-gray-400 ${isUser ? 'text-right' : 'text-left'}`}>
-          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className={`mt-1 flex items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          <div className="text-xs text-gray-400">
+            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          {!isUser && isAudioPlaying && onSkipAudio && (
+            <button
+              onClick={onSkipAudio}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+              aria-label="Skip voiceover"
+            >
+              <SkipForward className="w-3 h-3" />
+              Skip
+            </button>
+          )}
         </div>
       </div>
     </div>

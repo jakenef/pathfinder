@@ -84,7 +84,7 @@ export function buildMajorSuggestionContext(
   userProfile: UserProfile,
   majors: Major[]
 ): string {
-  return `Current phase: SUGGESTING MAJORS
+  return `Current phase: PRESENTING MAJOR MATCHES
 
 Based on our conversation, here are the student's key traits:
 - Interests: ${userProfile.interests.join(', ') || 'Not yet identified'}
@@ -92,10 +92,13 @@ Based on our conversation, here are the student's key traits:
 - Values: ${userProfile.values.join(', ') || 'Not yet identified'}
 - Work Style: ${userProfile.workStyle.join(', ') || 'Not yet identified'}
 
-Top matching majors to present:
-${majors.map(m => `- ${m.name}: ${m.description}`).join('\n')}
+Their responses during our conversation:
+${Object.entries(userProfile.responses).map(([q, a]) => `- ${q}: "${a}"`).join('\n')}
 
-Your task: Present these majors enthusiastically. For each one, explain specifically WHY it matches what they've told you about themselves. Make it personal and exciting. Keep it conversational - you're having a discussion, not reading a list.`;
+Top matching majors identified:
+${majors.map(m => `- ${m.name}: ${m.matchReason || m.description}`).join('\n')}
+
+Your task: You've finished asking questions. Now warmly transition into presenting these major matches. Explain how these majors connect to what they specifically told you about their interests, strengths, and values. Reference their actual responses. Make them feel excited about exploring these paths. Be conversational and personal - this is the reveal moment where you show them you've been listening. DO NOT ask any more questions.`;
 }
 
 export function buildCareerSuggestionContext(

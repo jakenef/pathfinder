@@ -7,6 +7,7 @@ export interface Message {
   role: MessageRole;
   content: string;
   timestamp: Date;
+  isAudioPlaying?: boolean;
 }
 
 export interface Major {

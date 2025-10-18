@@ -36,6 +36,7 @@ export function usePathfinderSession() {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [, setFinalTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [currentSpeakingMessageId, setCurrentSpeakingMessageId] = useState<string | null>(null);
 
   const transcriptRef = useRef('');
 
@@ -54,21 +55,55 @@ export function usePathfinderSession() {
     }));
   }, []);
 
-  const speakText = useCallback(async (_text: string) => {
-    return;
+  const speakText = useCallback(async (text: string, messageId?: string) => {
+    try {
+      setSession(prev => ({ ...prev, isAISpeaking: true }));
+      setAudioState(prev => ({ ...prev, isPlaying: true }));
+      if (messageId) {
+        setCurrentSpeakingMessageId(messageId);
+      }
+
+      const audioBuffer = await textToSpeech(text);
+      await audioPlayer.play(audioBuffer);
+
+      setSession(prev => ({ ...prev, isAISpeaking: false }));
+      setAudioState(prev => ({ ...prev, isPlaying: false }));
+      setCurrentSpeakingMessageId(null);
+    } catch (error) {
+      console.error('Error with text-to-speech:', error);
+      setSession(prev => ({ ...prev, isAISpeaking: false }));
+      setAudioState(prev => ({ ...prev, isPlaying: false }));
+      setCurrentSpeakingMessageId(null);
+      setError('Voice output unavailable. Continuing with text only.');
+      setTimeout(() => setError(null), 3000);
+    }
   }, []);
 
-  const processAIResponse = useCallback(async (contextBuilder: () => string, options?: { hideMessage?: boolean }) => {
+  const processAIResponse = useCallback(async (contextBuilder: () => string, options?: { hideMessage?: boolean, conversationHistory?: Array<{role: 'user' | 'assistant', content: string}> }) => {
     try {
       setSession(prev => ({ ...prev, isProcessing: true }));
 
       const context = contextBuilder();
-      const response = await sendMessage(session.conversationHistory, context);
+      const historyToUse = options?.conversationHistory || session.conversationHistory;
+      const response = await sendMessage(historyToUse, context);
 
+      let messageId: string | undefined;
       if (!options?.hideMessage) {
-        addMessage('assistant', response);
+        const message: Message = {
+          id: `${Date.now()}-${Math.random()}`,
+          role: 'assistant',
+          content: response,
+          timestamp: new Date()
+        };
+        messageId = message.id;
+
+        setSession(prev => ({
+          ...prev,
+          messages: [...prev.messages, message],
+          conversationHistory: [...prev.conversationHistory, { role: 'assistant', content: response }]
+        }));
       }
-      await speakText(response);
+      await speakText(response, messageId);
 
       setSession(prev => ({ ...prev, isProcessing: false }));
     } catch (error: any) {
@@ -77,12 +112,15 @@ export function usePathfinderSession() {
       setError(error.message || 'Failed to get response. Please try again.');
       setTimeout(() => setError(null), 5000);
     }
-  }, [session.conversationHistory, addMessage, speakText]);
+  }, [session.conversationHistory, speakText]);
 
   const handleUserMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || session.isProcessing || session.isAISpeaking) return;
 
     addMessage('user', userMessage);
+
+    // Create updated conversation history immediately
+    const updatedHistory = [...session.conversationHistory, { role: 'user' as const, content: userMessage }];
 
     if (session.phase === 'intake') {
       const currentQuestion = INTAKE_QUESTIONS[session.currentQuestionIndex];
@@ -98,7 +136,8 @@ export function usePathfinderSession() {
         setSession(prev => ({ ...prev, currentQuestionIndex: nextIndex }));
 
         await processAIResponse(() =>
-          buildIntakeContext(nextIndex, INTAKE_QUESTIONS.length, updatedProfile)
+          buildIntakeContext(nextIndex, INTAKE_QUESTIONS.length, updatedProfile),
+          { conversationHistory: updatedHistory }
         );
       } else {
         setSession(prev => ({ ...prev, phase: 'major_suggestions' }));
@@ -113,7 +152,7 @@ export function usePathfinderSession() {
 
         await processAIResponse(() =>
           buildMajorSuggestionContext(updatedProfile, scoredMajors),
-          { hideMessage: true }
+          { hideMessage: true, conversationHistory: updatedHistory }
         );
       }
     } else if (session.phase === 'major_suggestions' || session.phase === 'career_suggestions') {
@@ -124,7 +163,7 @@ export function usePathfinderSession() {
           return buildCareerSuggestionContext(session.userProfile, session.selectedMajor, session.suggestedCareers);
         }
         return '';
-      });
+      }, { conversationHistory: updatedHistory });
     }
   }, [session, addMessage, processAIResponse]);
 
@@ -134,9 +173,21 @@ export function usePathfinderSession() {
     const firstQuestion = INTAKE_QUESTIONS[0].question;
     const combinedMessage = `Hi! I'm Pathfinder, here to help you discover majors and careers that fit you. Let's start: ${firstQuestion}`;
 
-    addMessage('assistant', combinedMessage);
-    await speakText(combinedMessage);
-  }, [addMessage, speakText]);
+    const message: Message = {
+      id: `${Date.now()}-${Math.random()}`,
+      role: 'assistant',
+      content: combinedMessage,
+      timestamp: new Date()
+    };
+
+    setSession(prev => ({
+      ...prev,
+      messages: [...prev.messages, message],
+      conversationHistory: [...prev.conversationHistory, { role: 'assistant', content: combinedMessage }]
+    }));
+
+    await speakText(combinedMessage, message.id);
+  }, [speakText]);
 
   const selectMajor = useCallback(async (major: Major) => {
     setSession(prev => ({
@@ -151,9 +202,21 @@ export function usePathfinderSession() {
       suggestedCareers: careers
     }));
 
-    const message = `Great choice! ${major.name} is an excellent fit for you. Let me share some exciting career paths you can pursue with this major.`;
-    addMessage('assistant', message);
-    await speakText(message);
+    const messageText = `Great choice! ${major.name} is an excellent fit for you. Let me share some exciting career paths you can pursue with this major.`;
+    const message: Message = {
+      id: `${Date.now()}-${Math.random()}`,
+      role: 'assistant',
+      content: messageText,
+      timestamp: new Date()
+    };
+
+    setSession(prev => ({
+      ...prev,
+      messages: [...prev.messages, message],
+      conversationHistory: [...prev.conversationHistory, { role: 'assistant', content: messageText }]
+    }));
+
+    await speakText(messageText, message.id);
 
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -161,7 +224,7 @@ export function usePathfinderSession() {
       buildCareerSuggestionContext(session.userProfile, major, careers),
       { hideMessage: true }
     );
-  }, [session.userProfile, addMessage, speakText, processAIResponse]);
+  }, [session.userProfile, speakText, processAIResponse]);
 
   const goToSummary = useCallback(async () => {
     setSession(prev => ({ ...prev, phase: 'summary' }));
@@ -173,6 +236,13 @@ export function usePathfinderSession() {
     }
   }, [session, processAIResponse]);
 
+  const skipAudio = useCallback(() => {
+    audioPlayer.stop();
+    setSession(prev => ({ ...prev, isAISpeaking: false }));
+    setAudioState(prev => ({ ...prev, isPlaying: false }));
+    setCurrentSpeakingMessageId(null);
+  }, []);
+
   const restartSession = useCallback(() => {
     audioPlayer.stop();
     speechRecognitionService.abort();
@@ -180,6 +250,7 @@ export function usePathfinderSession() {
     setInterimTranscript('');
     setFinalTranscript('');
     setError(null);
+    setCurrentSpeakingMessageId(null);
   }, []);
 
   const toggleRecording = useCallback((shouldRecord: boolean) => {
@@ -195,9 +266,12 @@ export function usePathfinderSession() {
           if (isFinal) {
             transcriptRef.current += transcript + ' ';
             setFinalTranscript(transcriptRef.current.trim());
-            setInterimTranscript('');
+            // Keep showing accumulated text even after finalization
+            setInterimTranscript(transcriptRef.current.trim());
           } else {
-            setInterimTranscript(transcript);
+            // Show accumulated text + current interim text
+            const fullDisplay = transcriptRef.current + transcript;
+            setInterimTranscript(fullDisplay);
           }
         },
         (error) => {
@@ -237,11 +311,13 @@ export function usePathfinderSession() {
     audioState,
     interimTranscript,
     error,
+    currentSpeakingMessageId,
     startSession,
     handleUserMessage,
     selectMajor,
     goToSummary,
     restartSession,
-    toggleRecording
+    toggleRecording,
+    skipAudio
   };
 }

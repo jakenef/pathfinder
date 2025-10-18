@@ -54,8 +54,23 @@ export function usePathfinderSession() {
     }));
   }, []);
 
-  const speakText = useCallback(async (_text: string) => {
-    return;
+  const speakText = useCallback(async (text: string) => {
+    try {
+      setSession(prev => ({ ...prev, isAISpeaking: true }));
+      setAudioState(prev => ({ ...prev, isPlaying: true }));
+
+      const audioBuffer = await textToSpeech(text);
+      await audioPlayer.play(audioBuffer);
+
+      setSession(prev => ({ ...prev, isAISpeaking: false }));
+      setAudioState(prev => ({ ...prev, isPlaying: false }));
+    } catch (error) {
+      console.error('Error with text-to-speech:', error);
+      setSession(prev => ({ ...prev, isAISpeaking: false }));
+      setAudioState(prev => ({ ...prev, isPlaying: false }));
+      setError('Voice output unavailable. Continuing with text only.');
+      setTimeout(() => setError(null), 3000);
+    }
   }, []);
 
   const processAIResponse = useCallback(async (contextBuilder: () => string, options?: { hideMessage?: boolean }) => {
